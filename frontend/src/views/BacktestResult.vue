@@ -446,13 +446,14 @@ const renderChart = () => {
   chart.setOption({
     title: {
       text: '净值曲线对比',
+      left: 'center',
     },
     tooltip: {
       trigger: 'axis',
     },
     legend: {
       data: series.map(s => s.name),
-      top: 10,
+      bottom: 10,
     },
     xAxis: {
       type: 'category',
