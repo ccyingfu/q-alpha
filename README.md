@@ -1,43 +1,83 @@
 # Q-Alpha 量化投资策略回测系统
 
-一个基于 Python + Vue 3 的量化投资策略回测平台，帮助用户分析历史数据、回测投资组合、优化资产配置。
+> 一个专业的量化投资策略回测平台，帮助投资者分析历史数据、回测投资组合、优化资产配置。
 
-## 功能特性
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![Vue](https://img.shields.io/badge/Vue-3.5+-brightgreen.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-- 📊 **多资产数据获取**：支持指数、ETF、个股等金融数据
-- 💾 **本地数据存储**：基于 SQLite 的数据持久化
-- 🔄 **策略回测引擎**：支持定期再平衡、阈值触发等多种策略
-- 📈 **绩效指标计算**：夏普比率、最大回撤、卡玛比率等专业指标
-- 🎨 **可视化界面**：基于 ECharts 的交互式数据展示
+## ✨ 功能特性
 
-## 技术栈
+### 📊 数据管理
+- **多资产支持**：指数、ETF、个股等金融产品
+- **自动数据获取**：基于 AKShare 的实时数据抓取
+- **智能缓存机制**：Parquet 格式本地缓存，支持增量更新
+- **数据浏览**：按年/月/日粒度查看历史行情数据
+
+### 🎯 策略管理
+- **灵活配置**：支持自定义资产配置和权重
+- **多种策略**：预设保守型、平衡型、激进型策略模板
+- **再平衡方式**：支持按月、按季度、按年、阈值触发等方式
+- **权重校验**：自动校验资产权重总和为 100%
+
+### 🔄 回测引擎
+- **精确计算**：基于历史数据的组合净值模拟
+- **自动融资**：执行回测时自动获取缺失的市场数据
+- **日期范围控制**：精确控制回测时间段，确保数据准确性
+- **初始配置**：可自定义初始资金和再平衡策略
+
+### 📈 绩效分析
+- **收益指标**：总收益率、年化收益率（CAGR）
+- **风险指标**：最大回撤、波动率
+- **风险调整收益**：夏普比率、索提诺比率、卡玛比率
+- **可视化图表**：净值曲线、回撤曲线、年度收益对比
+
+### 🎨 用户界面
+- **响应式设计**：适配不同屏幕尺寸
+- **交互式图表**：基于 ECharts 的动态数据展示
+- **批量操作**：支持批量删除回测记录
+- **筛选排序**：按策略、日期范围筛选，多列排序
+- **分页浏览**：支持大量数据的分页展示
+
+## 🛠️ 技术栈
 
 ### 后端
-- Python 3.11+
-- FastAPI - Web 框架
-- SQLAlchemy 2.0 - ORM
-- AKShare - 金融数据源
-- Pandas/NumPy - 数据处理
+```
+Python 3.11+
+├── FastAPI          # 高性能 Web 框架
+├── SQLAlchemy 2.0   # ORM
+├── AKShare          # 金融数据源
+├── Pandas/NumPy     # 数据处理
+├── Pydantic         # 数据验证
+└── PyArrow          # 列式存储缓存
+```
 
 ### 前端
-- Vue 3 + TypeScript
-- Vite - 构建工具
-- ECharts - 数据可视化
-- Element Plus - UI 组件库
-- Pinia - 状态管理
+```
+Vue 3 + TypeScript
+├── Vite             # 快速构建工具
+├── Element Plus     # UI 组件库
+├── ECharts          # 数据可视化
+├── Pinia            # 状态管理
+└── Vue Router       # 路由管理
+```
 
-## 快速开始
+### 数据库
+- SQLite：轻量级关系数据库，支持异步操作
+
+## 🚀 快速开始
 
 ### 环境要求
 
-- Python 3.11+
-- Node.js 18+
+- **Python**: 3.11 或更高版本
+- **Node.js**: 18 或更高版本
+- **操作系统**: macOS, Linux, Windows
 
-### 安装
+### 安装步骤
 
 1. **克隆项目**
 ```bash
-git clone <repository-url>
+git clone https://github.com/ccyingfu/q-alpha.git
 cd q-alpha
 ```
 
@@ -61,55 +101,333 @@ cd ..
 ```
 
 4. **配置环境变量**
+
+已提供默认配置，可选创建自定义配置：
 ```bash
 cp .env.example .env
-# .env 文件已自动创建
+# 编辑 .env 文件自定义配置
 ```
 
 5. **初始化数据库**
 ```bash
-python scripts/init_db.py
+python -m scripts.init_db
 ```
 
-### 运行
+这将创建数据库并预设：
+- 8 个资产（沪深300、中证500、黄金ETF 等）
+- 3 个策略模板（保守型、平衡型、激进型）
 
-**启动后端**：
+### 运行项目
+
+**方式一：命令行启动**
+
+启动后端（项目根目录）：
 ```bash
 # 使用 pip 安装时
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 # 使用 Poetry 时
-poetry run uvicorn backend.main:app --reload
+poetry run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**启动前端**：
+启动前端：
 ```bash
 cd frontend
 npm run dev
 ```
 
-访问 http://localhost:5173 查看应用。
+**方式二：使用项目脚本**
 
-## 项目结构
+```bash
+# 启动后端
+./scripts/start-backend.sh
+
+# 启动前端
+./scripts/start-frontend.sh
+```
+
+### 访问应用
+
+- **前端界面**: http://localhost:5173
+- **API 文档**: http://localhost:8000/docs
+- **健康检查**: http://localhost:8000/health
+
+## 📖 使用指南
+
+### 1. 数据管理
+
+访问"数据管理"页面查看所有可用资产：
+- 点击"查看数据"浏览历史行情
+- 使用粒度切换（年/月/日）聚合数据
+- 通过搜索框快速定位特定日期
+- 点击表头可对任意列排序
+
+### 2. 创建策略
+
+1. 访问"策略配置"页面
+2. 点击"新建策略"按钮
+3. 填写策略信息：
+   - 策略名称
+   - 策略描述
+   - 再平衡方式（按月/按季度/按年/阈值触发）
+   - 资产配置：
+     - 点击"+ 添加资产"
+     - 从下拉列表选择资产
+     - 设置权重（自动校验总和 100%）
+     - 可删除已添加资产
+4. 点击"确定"创建策略
+
+### 3. 执行回测
+
+1. 在策略配置页点击"执行回测"
+2. 或在回测结果页点击"执行回测"
+3. 配置回测参数：
+   - 选择策略
+   - 设置开始/结束日期
+   - 设置初始资金
+4. 点击"执行"开始回测
+5. 系统自动：
+   - 获取缺失的市场数据
+   - 计算组合净值
+   - 生成绩效指标
+   - 绘制图表
+
+### 4. 查看结果
+
+回测完成后可查看：
+- **净值曲线**：组合价值随时间变化
+- **回撤曲线**：最大回撤分布
+- **绩效指标**：
+  - 总收益率
+  - 年化收益率
+  - 最大回撤
+  - 夏普比率
+  - 索提诺比率
+  - 卡玛比率
+  - 波动率
+
+### 5. 管理记录
+
+回测结果列表支持：
+- **批量删除**：勾选多条记录批量删除
+- **筛选**：按策略或日期范围筛选
+- **排序**：点击列头按任意指标排序
+- **分页**：支持 10/20/50/100 条每页
+
+## 📁 项目结构
 
 ```
 q-alpha/
-├── data_fetcher/      # 数据获取模块
-├── database/          # 数据库模块
-├── backend/           # 后端 API 模块
-├── frontend/          # 前端界面模块
-├── tests/             # 集成测试
-├── docs/              # 项目文档
-└── scripts/           # 辅助脚本
+├── backend/                 # 后端 API 模块
+│   ├── api/                # API 路由
+│   │   └── routes/         # 路由定义
+│   ├── schemas/            # Pydantic 模型
+│   ├── services/           # 业务逻辑
+│   │   ├── backtest_engine.py      # 回测引擎
+│   │   └── metrics_calculator.py  # 绩效计算
+│   ├── config.py           # 配置文件
+│   └── main.py             # 应用入口
+│
+├── database/               # 数据库模块
+│   ├── models/             # SQLAlchemy 模型
+│   ├── repositories/       # 数据访问层
+│   ├── seeds/              # 预设数据
+│   └── migrations/         # 数据库迁移
+│
+├── data_fetcher/           # 数据获取模块
+│   ├── base.py             # 抽象基类
+│   ├── akshare_fetcher.py  # AKShare 实现
+│   ├── cache_manager.py    # 缓存管理
+│   └── config.py           # 配置文件
+│
+├── frontend/               # 前端界面模块
+│   ├── src/
+│   │   ├── api/            # API 客户端
+│   │   ├── components/     # Vue 组件
+│   │   │   ├── charts/     # 图表组件
+│   │   │   └── forms/      # 表单组件
+│   │   ├── router/         # 路由配置
+│   │   ├── stores/         # Pinia 状态
+│   │   ├── types/          # TypeScript 类型
+│   │   ├── views/          # 页面视图
+│   │   │   ├── Dashboard.vue      # 仪表盘
+│   │   │   ├── StrategyConfig.vue # 策略配置
+│   │   │   ├── BacktestResult.vue # 回测结果
+│   │   │   └── DataManage.vue     # 数据管理
+│   │   └── main.ts
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── scripts/                # 辅助脚本
+│   ├── init_db.py          # 数据库初始化
+│   ├── start-backend.sh    # 后端启动脚本
+│   └── start-frontend.sh   # 前端启动脚本
+│
+├── tests/                  # 测试模块
+├── docs/                   # 项目文档
+├── .env.example            # 环境变量示例
+├── requirements.txt        # Python 依赖
+├── pyproject.toml          # Poetry 配置
+└── README.md               # 项目说明
 ```
 
-## 开发指南
+## 🔧 配置说明
 
-详细的开发文档请参考：
-- [开发技能手册](.qoder/skills/skills.md)
-- [API 文档](docs/api.md)
-- [部署指南](docs/deployment.md)
+### 环境变量
 
-## 许可证
+主要配置项（`.env` 文件）：
 
-MIT License
+```bash
+# API 配置
+API_HOST=0.0.0.0
+API_PORT=8000
+API_RELOAD=true
+
+# 数据库配置
+DATABASE_URL=sqlite:///./q_alpha.db
+
+# CORS 配置
+CORS_ORIGINS=["http://localhost:5173"]
+
+# 缓存配置
+FETCHER_CACHE_DIR=./data/cache
+FETCHER_CACHE_EXPIRE_HOURS=24
+FETCHER_ENABLE_CACHE=true
+
+# 回测配置
+RISK_FREE_RATE=0.03
+TRADING_DAYS_PER_YEAR=252
+```
+
+### 性能优化
+
+- **数据缓存**：使用 Parquet 格式缓存，减少网络请求
+- **批量插入**：数据库批量操作性能 > 10000 条/秒
+- **分页查询**：前端分页减少单次数据加载量
+- **懒加载**：图表按需渲染
+
+## 🧪 测试
+
+### 运行测试
+
+```bash
+# 后端测试
+pytest tests/
+
+# 前端测试
+cd frontend
+npm run test
+```
+
+### 测试覆盖
+
+- 数据获取准确性测试
+- 数据库 CRUD 操作测试
+- 回测逻辑测试
+- 绩效指标计算测试
+- API 接口测试
+
+## 📚 API 文档
+
+启动后端服务后，访问以下地址查看完整 API 文档：
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### 主要 API 端点
+
+```
+# 资产管理
+GET    /api/assets/           # 获取所有资产
+POST   /api/assets/           # 创建资产
+
+# 策略管理
+GET    /api/strategies/       # 获取所有策略
+POST   /api/strategies/       # 创建策略
+DELETE /api/strategies/{id}   # 删除策略
+
+# 市场数据
+GET    /api/market/{code}/daily  # 获取历史行情
+
+# 回测执行
+POST   /api/backtest/run     # 执行回测
+GET    /api/backtest/results # 获取回测结果列表
+DELETE /api/backtest/results/{id}  # 删除回测结果
+POST   /api/backtest/batch-delete  # 批量删除结果
+
+# 健康检查
+GET    /health               # 健康检查
+```
+
+## 🐛 问题排查
+
+### 常见问题
+
+**Q: 后端启动失败，提示 "ModuleNotFoundError"**
+```bash
+# 确保在项目根目录运行
+cd q-alpha
+# 使用绝对导入路径
+uvicorn backend.main:app --reload
+```
+
+**Q: 前端无法连接后端**
+```bash
+# 检查后端是否运行
+curl http://localhost:8000/health
+
+# 检查 .env 中的 CORS 配置
+# 确保 CORS_ORIGINS 包含前端地址
+```
+
+**Q: 数据获取失败**
+```bash
+# 检查网络连接
+# 清除缓存重新获取
+rm -rf data/cache/*
+```
+
+**Q: 回测结果为空**
+```bash
+# 确保所选日期范围内有市场数据
+# 在"数据管理"页面检查资产数据
+# 执行回测时会自动获取缺失数据
+```
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 提交 Pull Request
+
+### 开发规范
+
+- 遵循 PEP 8 Python 代码规范
+- 遵循 Vue 3 组合式 API 风格
+- 添加单元测试
+- 更新相关文档
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+
+## 🙏 致谢
+
+- [AKShare](https://akshare.akfamily.xyz/) - 中国金融数据接口
+- [FastAPI](https://fastapi.tiangolo.com/) - 现代化 Python Web 框架
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
+- [ECharts](https://echarts.apache.org/) - 强大的数据可视化库
+- [Element Plus](https://element-plus.org/) - 优秀的 Vue 3 UI 组件库
+
+## 📮 联系方式
+
+- 项目主页: [https://github.com/ccyingfu/q-alpha](https://github.com/ccyingfu/q-alpha)
+- 问题反馈: [GitHub Issues](https://github.com/ccyingfu/q-alpha/issues)
+
+---
+
+**⭐ 如果这个项目对你有帮助，请给个 Star 支持一下！**
