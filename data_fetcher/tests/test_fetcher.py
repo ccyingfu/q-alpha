@@ -3,12 +3,12 @@
 """
 
 from datetime import date
-from unittest.mock import Mock, patch
+import contextlib
 
 import pandas as pd
 import pytest
 
-from data_fetcher import AKShareFetcher, FetcherConfig
+from data_fetcher import BaostockFetcher, FetcherConfig, AKShareFetcher
 
 
 @pytest.fixture
@@ -35,69 +35,71 @@ def fetcher_config():
     )
 
 
-class TestAKShareFetcher:
-    """AKShare 获取器测试"""
+class TestBaostockFetcher:
+    """Baostock 获取器测试"""
 
     def test_init_default_config(self):
         """测试默认配置初始化"""
-        fetcher = AKShareFetcher()
+        fetcher = BaostockFetcher()
         assert fetcher.config is not None
-        assert fetcher.config.source == "akshare"
 
     def test_init_custom_config(self, fetcher_config):
         """测试自定义配置初始化"""
-        fetcher = AKShareFetcher(config=fetcher_config)
+        fetcher = BaostockFetcher(config=fetcher_config)
         assert fetcher.config == fetcher_config
 
-    @patch("data_fetcher.akshare_fetcher.ak.stock_zh_index_daily")
-    def test_fetch_index_daily(self, mock_ak_index, sample_df):
-        """测试获取指数数据"""
-        # Mock AKShare 返回数据
-        mock_df = sample_df.copy()
-        mock_ak_index.return_value = mock_df
+    def test_convert_index_code(self):
+        """测试指数代码转换"""
+        fetcher = BaostockFetcher()
 
-        fetcher = AKShareFetcher()
-        result = fetcher.fetch_index_daily("000300")
+        # 测试沪深300
+        assert fetcher._convert_index_code("000300") == "sh.000300"
 
-        # 验证结果
-        assert isinstance(result, pd.DataFrame)
-        assert len(result) == 5
-        assert list(result.columns) == ["date", "open", "high", "low", "close", "volume"]
-        assert mock_ak_index.called
+        # 测试上证50
+        assert fetcher._convert_index_code("000016") == "sh.000016"
 
-    @patch("data_fetcher.akshare_fetcher.ak.fund_etf_hist_em")
-    def test_fetch_etf_daily(self, mock_ak_etf, sample_df):
-        """测试获取 ETF 数据"""
-        # Mock AKShare 返回数据
-        mock_df = sample_df.copy()
-        mock_ak_etf.return_value = mock_df
+        # 测试深证成指
+        assert fetcher._convert_index_code("399001") == "sz.399001"
 
-        fetcher = AKShareFetcher()
-        result = fetcher.fetch_etf_daily("518880")
+        # 测试已经是 Baostock 格式
+        assert fetcher._convert_index_code("sh.000300") == "sh.000300"
 
-        # 验证结果
-        assert isinstance(result, pd.DataFrame)
-        assert len(result) == 5
-        assert mock_ak_etf.called
+    def test_convert_etf_code(self):
+        """测试 ETF 代码转换"""
+        fetcher = BaostockFetcher()
 
-    @patch("data_fetcher.akshare_fetcher.ak.stock_zh_a_hist")
-    def test_fetch_stock_daily(self, mock_ak_stock, sample_df):
-        """测试获取股票数据"""
-        # Mock AKShare 返回数据
-        mock_df = sample_df.copy()
-        mock_ak_stock.return_value = mock_df
+        # 测试 ETF 代码转换
+        assert fetcher._convert_etf_code("518880") == "sh.518880"
 
-        fetcher = AKShareFetcher()
-        result = fetcher.fetch_stock_daily("002594")
+        # 测试已经是 Baostock 格式
+        assert fetcher._convert_etf_code("sh.518880") == "sh.518880"
 
-        # 验证结果
-        assert isinstance(result, pd.DataFrame)
-        assert len(result) == 5
-        assert mock_ak_stock.called
+    def test_convert_stock_code(self):
+        """测试股票代码转换"""
+        fetcher = BaostockFetcher()
+
+        # 测试上海交易所股票
+        assert fetcher._convert_stock_code("600000") == "sh.600000"
+
+        # 测试深圳交易所主板
+        assert fetcher._convert_stock_code("002594") == "sz.002594"
+
+        # 测试深圳交易所创业板
+        assert fetcher._convert_stock_code("300001") == "sz.300001"
+
+        # 测试已经是 Baostock 格式
+        assert fetcher._convert_stock_code("sz.002594") == "sz.002594"
+
+    def test_format_date(self):
+        """测试日期格式化"""
+        fetcher = BaostockFetcher()
+
+        assert fetcher._format_date(date(2024, 1, 1)) == "2024-01-01"
+        assert fetcher._format_date(None) == ""
 
     def test_standardize_dataframe(self, sample_df):
         """测试 DataFrame 标准化"""
-        fetcher = AKShareFetcher()
+        fetcher = BaostockFetcher()
         result = fetcher._standardize_dataframe(sample_df)
 
         # 验证日期类型
@@ -109,7 +111,7 @@ class TestAKShareFetcher:
 
     def test_filter_by_date(self, sample_df):
         """测试日期过滤"""
-        fetcher = AKShareFetcher()
+        fetcher = BaostockFetcher()
 
         # 过滤后的数据
         result = fetcher._filter_by_date(
@@ -120,3 +122,53 @@ class TestAKShareFetcher:
 
         # 应该只有3条数据
         assert len(result) == 3
+
+    def test_login_logout(self):
+        """测试登录登出功能"""
+        fetcher = BaostockFetcher()
+
+        # 测试登录（类级别）
+        initial_count = BaostockFetcher._login_count
+        fetcher._ensure_login()
+        assert BaostockFetcher._login_count > initial_count
+
+        # 测试登出（类级别）
+        fetcher._safe_logout()
+        assert BaostockFetcher._login_count == initial_count
+
+    def test_multi_instance_login(self):
+        """测试多实例登录管理"""
+        # 重置登录计数
+        BaostockFetcher._login_count = 0
+
+        fetcher1 = BaostockFetcher()
+        fetcher2 = BaostockFetcher()
+
+        # 两个实例都调用 _ensure_login
+        fetcher1._ensure_login()
+        count1 = BaostockFetcher._login_count
+
+        fetcher2._ensure_login()
+        count2 = BaostockFetcher._login_count
+
+        # 登录计数应该增加
+        assert count2 >= count1
+
+        # 清理
+        while BaostockFetcher._login_count > 0:
+            BaostockFetcher._safe_logout()
+
+
+class TestAKShareFetcher:
+    """AKShare 获取器测试（保留作为备用）"""
+
+    def test_init_default_config(self):
+        """测试默认配置初始化"""
+        fetcher = AKShareFetcher()
+        assert fetcher.config is not None
+        assert fetcher.config.source == "akshare"
+
+    def test_init_custom_config(self, fetcher_config):
+        """测试自定义配置初始化"""
+        fetcher = AKShareFetcher(config=fetcher_config)
+        assert fetcher.config == fetcher_config

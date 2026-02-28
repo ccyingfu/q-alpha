@@ -144,11 +144,15 @@ class MetricsCalculator:
         Returns:
             年化波动率
         """
-        if len(returns) == 0:
+        if len(returns) < 2:
             return 0.0
 
         # 日波动率
         daily_vol = returns.std()
+
+        # 如果标准差为 NaN（所有值相同），返回 0
+        if pd.isna(daily_vol) or daily_vol == 0:
+            return 0.0
 
         # 年化波动率
         annual_vol = daily_vol * np.sqrt(self.trading_days_per_year)

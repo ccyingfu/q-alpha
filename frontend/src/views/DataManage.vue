@@ -11,10 +11,30 @@
         </div>
       </template>
 
-      <el-table :data="assetStore.assets" stripe>
-        <el-table-column prop="code" label="代码" width="120" />
-        <el-table-column prop="name" label="名称" width="150" />
-        <el-table-column prop="type" label="类型" width="100">
+      <!-- 筛选工具栏 -->
+      <div class="filter-toolbar">
+        <el-select v-model="filterType" placeholder="类型" clearable style="width: 120px">
+          <el-option label="全部" value="" />
+          <el-option label="指数" value="index" />
+          <el-option label="ETF" value="etf" />
+          <el-option label="股票" value="stock" />
+          <el-option label="债券" value="bond" />
+          <el-option label="基金" value="fund" />
+          <el-option label="商品" value="commodity" />
+        </el-select>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索代码/名称"
+          clearable
+          style="width: 200px; margin-left: 12px"
+        />
+      </div>
+
+      <!-- 资产表格 -->
+      <el-table :data="pagedAssets" stripe @sort-change="handleSortChange">
+        <el-table-column prop="code" label="代码" width="120" sortable />
+        <el-table-column prop="name" label="名称" width="150" sortable />
+        <el-table-column prop="type" label="类型" width="100" sortable>
           <template #default="{ row }">
             <el-tag>{{ row.type }}</el-tag>
           </template>
@@ -22,10 +42,21 @@
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column label="操作" width="150">
           <template #default="{ row }">
-            <el-button link type="primary" @click="viewData(row)">查看数据</el-button>
+            <el-button link type="primary" @click="viewData(row)">查看</el-button>
+            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 资产列表分页 -->
+      <el-pagination
+        v-model:current-page="assetCurrentPage"
+        v-model:page-size="assetPageSize"
+        :page-sizes="assetPageSizes"
+        :total="filteredAssets.length"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
     </el-card>
 
     <!-- 添加资产对话框 -->
@@ -134,8 +165,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Loading } from '@element-plus/icons-vue'
 import { useAssetStore } from '../stores/asset'
 import { marketApi } from '../api/client'
@@ -143,6 +174,19 @@ import type { Asset, MarketDataPoint } from '../types'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const assetStore = useAssetStore()
+
+// 资产列表筛选
+const filterType = ref<string>('')
+const searchKeyword = ref('')
+
+// 资产列表分页
+const assetCurrentPage = ref(1)
+const assetPageSize = ref(10)
+const assetPageSizes = [10, 20, 50, 100]
+
+// 资产列表排序
+const sortProp = ref<string>('')
+const sortOrder = ref<string>('')
 
 // 数据详情对话框相关
 const showDataDialog = ref(false)
@@ -204,6 +248,44 @@ const formRules: FormRules = {
   ],
   type: [{ required: true, message: '请选择资产类型', trigger: 'change' }],
 }
+
+// 筛选后的资产列表
+const filteredAssets = computed(() => {
+  let result = assetStore.assets
+
+  // 类型筛选
+  if (filterType.value) {
+    result = result.filter((a) => a.type === filterType.value)
+  }
+
+  // 关键词搜索
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    result = result.filter(
+      (a) =>
+        a.code.toLowerCase().includes(keyword) ||
+        a.name.toLowerCase().includes(keyword)
+    )
+  }
+
+  // 排序
+  if (sortProp.value && sortOrder.value) {
+    result = [...result].sort((a, b) => {
+      const valA = (a as any)[sortProp.value] || ''
+      const valB = (b as any)[sortProp.value] || ''
+      const compare = valA.localeCompare(valB, 'zh-CN')
+      return sortOrder.value === 'ascending' ? compare : -compare
+    })
+  }
+
+  return result
+})
+
+// 分页后的资产列表
+const pagedAssets = computed(() => {
+  const start = (assetCurrentPage.value - 1) * assetPageSize.value
+  return filteredAssets.value.slice(start, start + assetPageSize.value)
+})
 
 // 防抖函数
 function debounce<T extends (...args: any[]) => any>(
@@ -281,6 +363,17 @@ const handleNameBlur = debounce(async () => {
   }
 }, 300)
 
+// 排序变化
+const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
+  sortProp.value = prop
+  sortOrder.value = order
+}
+
+// 筛选变化时重置页码
+watch([filterType, searchKeyword], () => {
+  assetCurrentPage.value = 1
+})
+
 // 打开添加对话框
 const handleAdd = () => {
   showAddDialog.value = true
@@ -328,6 +421,29 @@ const handleSubmit = async () => {
   }
 }
 
+// 删除资产
+const handleDelete = async (asset: Asset) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除资产「${asset.code} - ${asset.name}」吗？`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+
+    await assetStore.deleteAsset(asset.id)
+    ElMessage.success('删除成功')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      const message = error.response?.data?.detail || error.message || '删除失败'
+      ElMessage.error(message)
+    }
+  }
+}
+
 // 按粒度聚合数据
 const aggregatedData = computed(() => {
   if (!marketData.value.length) return []
@@ -338,10 +454,11 @@ const aggregatedData = computed(() => {
 
   // 年/月聚合逻辑
   const grouped = new Map<string, MarketDataPoint[]>()
-  marketData.value.forEach(item => {
-    const key = dataGranularity.value === 'year'
-      ? item.date.substring(0, 4)
-      : item.date.substring(0, 7)
+  marketData.value.forEach((item) => {
+    const key =
+      dataGranularity.value === 'year'
+        ? item.date.substring(0, 4)
+        : item.date.substring(0, 7)
     if (!grouped.has(key)) grouped.set(key, [])
     grouped.get(key)!.push(item)
   })
@@ -349,8 +466,8 @@ const aggregatedData = computed(() => {
   return Array.from(grouped.entries()).map(([period, items]) => ({
     date: period,
     open: items[0].open,
-    high: Math.max(...items.map(i => i.high)),
-    low: Math.min(...items.map(i => i.low)),
+    high: Math.max(...items.map((i) => i.high)),
+    low: Math.min(...items.map((i) => i.low)),
     close: items[items.length - 1].close,
     volume: items.reduce((sum, i) => sum + i.volume, 0),
   }))
@@ -359,9 +476,7 @@ const aggregatedData = computed(() => {
 // 搜索过滤
 const filteredData = computed(() => {
   if (!searchDate.value) return aggregatedData.value
-  return aggregatedData.value.filter(item =>
-    item.date.includes(searchDate.value)
-  )
+  return aggregatedData.value.filter((item) => item.date.includes(searchDate.value))
 })
 
 // 分页数据
@@ -414,6 +529,12 @@ const viewData = async (asset: Asset) => {
 .header-actions {
   display: flex;
   gap: 8px;
+}
+
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
 .data-toolbar {

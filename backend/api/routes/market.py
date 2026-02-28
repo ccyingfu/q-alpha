@@ -12,7 +12,7 @@ from database.connection import get_db
 from database.repositories import AssetRepository, MarketDataRepository
 from database.models import Asset
 from backend.schemas import MarketDataResponse, MarketDataPoint
-from data_fetcher import AKShareFetcher
+from data_fetcher import BaostockFetcher
 
 router = APIRouter()
 
@@ -59,7 +59,7 @@ async def get_market_daily(
 
     # 如果数据库没有数据或需要刷新，从数据源获取
     if not market_data or refresh:
-        fetcher = AKShareFetcher()
+        fetcher = BaostockFetcher()
 
         # 根据资产类型选择获取方法
         if asset.type == "index":
@@ -82,6 +82,13 @@ async def get_market_daily(
             )
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported asset type: {asset.type}")
+
+        # 检查数据是否为空
+        if df.empty:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未获取到 {asset_code}({asset.name}) 的市场数据，请检查资产代码或日期范围"
+            )
 
         # 存储到数据库
         if not refresh:

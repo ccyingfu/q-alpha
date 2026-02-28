@@ -4,8 +4,9 @@
 执行投资组合策略回测。
 """
 
+import math
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -14,6 +15,21 @@ from database.models import Strategy
 from database.repositories import AssetRepository, MarketDataRepository
 from .metrics_calculator import MetricsCalculator
 from ..config import settings
+
+
+def _sanitize_metric(value: Optional[float]) -> Optional[float]:
+    """
+    清理指标值，将 NaN 转换为 None
+
+    Args:
+        value: 原始指标值
+
+    Returns:
+        清理后的值（NaN -> None）
+    """
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    return value
 
 
 class BacktestEngine:
@@ -144,18 +160,19 @@ class BacktestEngine:
         # 6. 创建回测结果对象
         from database.models import BacktestResult
 
+        # 清理指标值中的 NaN
         result = BacktestResult(
             strategy_id=strategy.id,
             start_date=start_date,
             end_date=end_date,
             initial_capital=initial_capital,
-            total_return=metrics["total_return"],
-            annual_return=metrics["annual_return"],
-            max_drawdown=metrics["max_drawdown"],
-            sharpe_ratio=metrics["sharpe_ratio"],
-            sortino_ratio=metrics["sortino_ratio"],
-            calmar_ratio=metrics["calmar_ratio"],
-            volatility=metrics["volatility"],
+            total_return=_sanitize_metric(metrics["total_return"]) or 0.0,
+            annual_return=_sanitize_metric(metrics["annual_return"]) or 0.0,
+            max_drawdown=_sanitize_metric(metrics["max_drawdown"]) or 0.0,
+            sharpe_ratio=_sanitize_metric(metrics["sharpe_ratio"]),
+            sortino_ratio=_sanitize_metric(metrics["sortino_ratio"]),
+            calmar_ratio=_sanitize_metric(metrics["calmar_ratio"]),
+            volatility=_sanitize_metric(metrics["volatility"]) or 0.0,
             rebalance_count=rebalance_count,
             equity_curve=equity_curve,
             drawdown_curve=drawdown_curve,

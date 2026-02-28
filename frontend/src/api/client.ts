@@ -6,7 +6,10 @@ import axios from 'axios'
 import type { Asset, ExternalAssetSearchResult, Strategy, BacktestRequest, BacktestResponse, MarketDataResponse } from '../types'
 
 // API 基础 URL
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// 使用空字符串让请求通过 Vite 代理，避免 CORS 问题
+// 开发环境：通过 Vite 代理转发到 http://localhost:8000
+// 生产环境：需要配置 VITE_API_URL 环境变量指向实际 API 地址
+const BASE_URL = import.meta.env.VITE_API_URL || ''
 
 // 创建 axios 实例
 const api = axios.create({

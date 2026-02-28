@@ -16,7 +16,7 @@ from database.repositories import (
 )
 from backend.schemas import BacktestRequest, BacktestResponse, BatchDeleteRequest
 from backend.services.backtest_engine import BacktestEngine
-from data_fetcher import AKShareFetcher
+from data_fetcher import BaostockFetcher
 
 router = APIRouter()
 
@@ -42,7 +42,7 @@ async def run_backtest(
     # 确保所有资产的市场数据已加载
     asset_repo = AssetRepository(db)
     market_repo = MarketDataRepository(db)
-    fetcher = AKShareFetcher()
+    fetcher = BaostockFetcher()
 
     for asset_code in strategy.allocation.keys():
         asset = asset_repo.get_by_code(asset_code)
@@ -82,6 +82,13 @@ async def run_backtest(
                 else:
                     raise HTTPException(
                         status_code=400, detail=f"Unsupported asset type: {asset.type}"
+                    )
+
+                # 检查数据是否为空
+                if df.empty:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"未获取到 {asset_code}({asset.name}) 的市场数据，请检查资产代码或日期范围"
                     )
 
                 # 存储到数据库
