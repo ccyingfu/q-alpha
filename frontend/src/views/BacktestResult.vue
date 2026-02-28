@@ -137,9 +137,9 @@
       <!-- 曲线显示控制 -->
       <div class="chart-controls">
         <el-checkbox-group v-model="visibleCurves">
-          <el-checkbox label="strategy" disabled>策略净值</el-checkbox>
-          <el-checkbox label="sh" v-if="selectedResult.benchmark_curves?.sh">上证指数</el-checkbox>
-          <el-checkbox label="hs300" v-if="selectedResult.benchmark_curves?.hs300">沪深300</el-checkbox>
+          <el-checkbox value="strategy" disabled>策略净值</el-checkbox>
+          <el-checkbox value="sh" v-if="selectedResult.benchmark_curves?.sh">上证指数</el-checkbox>
+          <el-checkbox value="hs300" v-if="selectedResult.benchmark_curves?.hs300">沪深300</el-checkbox>
         </el-checkbox-group>
       </div>
 
