@@ -73,6 +73,12 @@ async def run_backtest(
                         request.start_date.date(),
                         request.end_date.date(),
                     )
+                elif asset.type == "stock":
+                    df = fetcher.fetch_stock_daily(
+                        asset_code,
+                        request.start_date.date(),
+                        request.end_date.date(),
+                    )
                 else:
                     raise HTTPException(
                         status_code=400, detail=f"Unsupported asset type: {asset.type}"
@@ -81,11 +87,26 @@ async def run_backtest(
                 # 存储到数据库
                 market_repo.bulk_create_from_df(df, asset.id)
 
+            except HTTPException:
+                raise
             except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to fetch market data for {asset_code}: {str(e)}",
-                )
+                # 提取更友好的错误信息
+                error_msg = str(e)
+                if "ConnectionError" in error_msg or "ProxyError" in error_msg or "RemoteDisconnected" in error_msg:
+                    raise HTTPException(
+                        status_code=503,
+                        detail=f"无法获取 {asset_code}({asset.name}) 的市场数据，请检查网络连接或稍后重试",
+                    )
+                elif "RetryError" in error_msg:
+                    raise HTTPException(
+                        status_code=503,
+                        detail=f"获取 {asset_code}({asset.name}) 数据超时，请检查网络连接或稍后重试",
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"获取 {asset_code}({asset.name}) 数据失败: {error_msg}",
+                    )
 
     # 执行回测
     engine = BacktestEngine(db)

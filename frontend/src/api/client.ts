@@ -34,6 +34,23 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('API Error:', error)
+
+    // 提取后端返回的错误信息
+    if (error.response?.data?.detail) {
+      // 后端 FastAPI 返回的错误格式: {"detail": "错误信息"}
+      error.message = error.response.data.detail
+    } else if (error.response?.data?.message) {
+      // 其他格式的错误信息
+      error.message = error.response.data.message
+    } else if (error.response?.statusText) {
+      error.message = error.response.statusText
+    } else if (error.message) {
+      // 网络错误等
+      // 保持原始错误信息
+    } else {
+      error.message = '请求失败，请稍后重试'
+    }
+
     return Promise.reject(error)
   }
 )

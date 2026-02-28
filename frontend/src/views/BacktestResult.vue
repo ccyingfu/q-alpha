@@ -12,7 +12,7 @@
             >
               批量删除 ({{ selectedIds.length }})
             </el-button>
-            <el-button type="primary" @click="showRunDialog = true">执行回测</el-button>
+            <el-button type="primary" @click="openRunDialog">执行回测</el-button>
           </div>
         </div>
       </template>
@@ -130,7 +130,15 @@
     </el-card>
 
     <!-- 执行回测对话框 -->
-    <el-dialog v-model="showRunDialog" title="执行回测" width="400px">
+    <el-dialog v-model="showRunDialog" title="执行回测" width="450px">
+      <el-alert
+        v-if="backtestError"
+        :title="backtestError"
+        type="error"
+        :closable="true"
+        @close="backtestError = ''"
+        style="margin-bottom: 16px"
+      />
       <el-form :model="form" label-width="100px">
         <el-form-item label="策略">
           <el-select v-model="form.strategy_id" placeholder="请选择策略">
@@ -189,6 +197,7 @@ const strategyStore = useStrategyStore()
 
 const selectedResult = ref<BacktestResponse | null>(null)
 const showRunDialog = ref(false)
+const backtestError = ref('')
 const chartRef = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
 
@@ -302,7 +311,15 @@ const selectResult = (result: BacktestResponse) => {
   })
 }
 
+const openRunDialog = () => {
+  backtestError.value = ''
+  showRunDialog.value = true
+}
+
 const runBacktest = async () => {
+  // 清除之前的错误
+  backtestError.value = ''
+
   try {
     // 日期已经是 YYYY-MM-DD 格式，只需添加时间部分
     const formatDateTime = (dateStr: string) => {
@@ -321,8 +338,22 @@ const runBacktest = async () => {
     if (backtestStore.results.length > 0) {
       selectResult(backtestStore.results[0]!)
     }
-  } catch (error) {
-    ElMessage.error('回测执行失败')
+  } catch (error: any) {
+    // 提取更详细的错误信息
+    let errorMsg = '回测执行失败，请稍后重试'
+
+    if (error.response?.data?.detail) {
+      const detail = error.response.data.detail
+      // 后端已经返回了友好的中文错误信息
+      errorMsg = detail
+    } else if (error.message) {
+      errorMsg = error.message
+    }
+
+    // 显示在对话框中
+    backtestError.value = errorMsg
+    // 同时显示 Toast 提示
+    ElMessage.error(errorMsg)
   }
 }
 

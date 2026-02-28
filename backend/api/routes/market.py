@@ -74,6 +74,12 @@ async def get_market_daily(
                 start_date.date() if start_date else None,
                 end_date.date() if end_date else None,
             )
+        elif asset.type == "stock":
+            df = fetcher.fetch_stock_daily(
+                asset_code,
+                start_date.date() if start_date else None,
+                end_date.date() if end_date else None,
+            )
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported asset type: {asset.type}")
 
