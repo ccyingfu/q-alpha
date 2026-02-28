@@ -10,7 +10,7 @@
 
 ### 📊 数据管理
 - **多资产支持**：指数、ETF、个股等金融产品
-- **自动数据获取**：基于 AKShare 的实时数据抓取
+- **自动数据获取**：基于 Baostock 的实时数据抓取（免费、无需注册）
 - **智能缓存机制**：Parquet 格式本地缓存，支持增量更新
 - **数据浏览**：按年/月/日粒度查看历史行情数据
 
@@ -46,7 +46,8 @@
 Python 3.11+
 ├── FastAPI          # 高性能 Web 框架
 ├── SQLAlchemy 2.0   # ORM
-├── AKShare          # 金融数据源
+├── Baostock         # 金融数据源（主要）
+├── AKShare          # 金融数据源（备用）
 ├── Pandas/NumPy     # 数据处理
 ├── Pydantic         # 数据验证
 └── PyArrow          # 列式存储缓存
@@ -83,12 +84,20 @@ cd q-alpha
 
 2. **安装 Python 依赖**
 
-使用 pip：
+推荐使用虚拟环境：
 ```bash
+# 创建虚拟环境
+python3 -m venv .venv
+
+# 激活虚拟环境
+source .venv/bin/activate  # macOS/Linux
+# 或 .venv\Scripts\activate  # Windows
+
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-或使用 Poetry（推荐）：
+或使用 Poetry：
 ```bash
 poetry install
 ```
@@ -123,11 +132,11 @@ python -m scripts.init_db
 
 启动后端（项目根目录）：
 ```bash
-# 使用 pip 安装时
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+# 激活虚拟环境
+source .venv/bin/activate
 
-# 使用 Poetry 时
-poetry run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+# 启动服务
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 启动前端：
@@ -236,7 +245,8 @@ q-alpha/
 │
 ├── data_fetcher/           # 数据获取模块
 │   ├── base.py             # 抽象基类
-│   ├── akshare_fetcher.py  # AKShare 实现
+│   ├── baostock_fetcher.py # Baostock 实现（主要数据源）
+│   ├── akshare_fetcher.py  # AKShare 实现（备用数据源）
 │   ├── cache_manager.py    # 缓存管理
 │   └── config.py           # 配置文件
 │
@@ -417,6 +427,7 @@ rm -rf data/cache/*
 
 ## 🙏 致谢
 
+- [Baostock](http://baostock.com/) - 证券宝免费数据接口
 - [AKShare](https://akshare.akfamily.xyz/) - 中国金融数据接口
 - [FastAPI](https://fastapi.tiangolo.com/) - 现代化 Python Web 框架
 - [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架

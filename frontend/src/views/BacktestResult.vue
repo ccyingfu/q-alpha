@@ -134,6 +134,8 @@
         </el-col>
       </el-row>
 
+      <div ref="chartRef" style="width: 100%; height: 400px"></div>
+
       <!-- 曲线显示控制 -->
       <div class="chart-controls">
         <el-checkbox-group v-model="visibleCurves">
@@ -142,8 +144,6 @@
           <el-checkbox value="hs300" v-if="selectedResult.benchmark_curves?.hs300">沪深300</el-checkbox>
         </el-checkbox-group>
       </div>
-
-      <div ref="chartRef" style="width: 100%; height: 400px; margin-top: 20px"></div>
     </el-card>
 
     <!-- 执行回测对话框 -->
