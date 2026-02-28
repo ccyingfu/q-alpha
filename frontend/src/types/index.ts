@@ -90,5 +90,9 @@ export interface BacktestResponse {
   metrics: PerformanceMetrics
   equity_curve: Array<{ date: string; value: number }>
   drawdown_curve: Array<{ date: string; value: number }>
+  benchmark_curves?: {
+    sh?: Array<{ date: string; value: number }>  // 上证指数
+    hs300?: Array<{ date: string; value: number }>  // 沪深300
+  }
   created_at: string
 }

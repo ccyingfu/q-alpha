@@ -58,14 +58,19 @@
         :data="pagedResults"
         @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
-        :default-sort="{ prop: 'id', order: 'descending' }"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="id" label="ID" width="80" sortable />
         <el-table-column prop="strategy_name" label="策略" />
         <el-table-column label="时间范围">
           <template #default="{ row }">
             {{ formatDate(row.start_date) }} ~ {{ formatDate(row.end_date) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="total_return" label="总收益率" sortable>
+          <template #default="{ row }">
+            <span :class="getReturnClass(row.metrics.total_return)">
+              {{ (row.metrics.total_return * 100).toFixed(2) }}%
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="annual_return" label="年化收益" sortable>
@@ -85,10 +90,13 @@
             {{ row.metrics.sharpe_ratio?.toFixed(2) || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="selectResult(row)">
               查看
+            </el-button>
+            <el-button link type="danger" @click="handleDelete(row)">
+              删除
             </el-button>
           </template>
         </el-table-column>
@@ -125,6 +133,15 @@
           <el-statistic title="夏普比率" :value="selectedResult.metrics.sharpe_ratio" :precision="2" />
         </el-col>
       </el-row>
+
+      <!-- 曲线显示控制 -->
+      <div class="chart-controls">
+        <el-checkbox-group v-model="visibleCurves">
+          <el-checkbox label="strategy" disabled>策略净值</el-checkbox>
+          <el-checkbox label="sh" v-if="selectedResult.benchmark_curves?.sh">上证指数</el-checkbox>
+          <el-checkbox label="hs300" v-if="selectedResult.benchmark_curves?.hs300">沪深300</el-checkbox>
+        </el-checkbox-group>
+      </div>
 
       <div ref="chartRef" style="width: 100%; height: 400px; margin-top: 20px"></div>
     </el-card>
@@ -183,7 +200,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
@@ -201,6 +218,9 @@ const backtestError = ref('')
 const chartRef = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
 
+// 曲线显示控制
+const visibleCurves = ref<string[]>(['sh', 'hs300'])
+
 // 多选状态
 const selectedIds = ref<number[]>([])
 
@@ -208,10 +228,19 @@ const selectedIds = ref<number[]>([])
 const filterStrategy = ref<number | undefined>()
 const filterDateRange = ref<[string, string] | undefined>()
 
+// 获取当前日期的 YYYY-MM-DD 格式
+const getTodayDate = () => {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const form = ref({
   strategy_id: Number(route.query.strategy_id) || undefined,
   start_date: '2020-01-01',
-  end_date: '2024-12-31',
+  end_date: getTodayDate(),
   initial_capital: 100000,
 })
 
@@ -304,6 +333,13 @@ onMounted(async () => {
   }
 })
 
+// 监听曲线显示变化，重新渲染图表
+watch(visibleCurves, () => {
+  if (selectedResult.value) {
+    renderChart()
+  }
+})
+
 const selectResult = (result: BacktestResponse) => {
   selectedResult.value = result
   nextTick(() => {
@@ -369,12 +405,54 @@ const renderChart = () => {
   const dates = selectedResult.value.equity_curve.map((e) => e.date)
   const values = selectedResult.value.equity_curve.map((e) => e.value)
 
+  // 构建系列数据
+  const series: any[] = [
+    {
+      name: '策略净值',
+      type: 'line',
+      data: values,
+      smooth: true,
+      lineStyle: { width: 3 },
+      itemStyle: { color: '#f56c6c' },
+    }
+  ]
+
+  // 添加上证指数
+  if (visibleCurves.value.includes('sh') && selectedResult.value.benchmark_curves?.sh) {
+    const shValues = selectedResult.value.benchmark_curves.sh.map((e) => e.value)
+    series.push({
+      name: '上证指数',
+      type: 'line',
+      data: shValues,
+      smooth: true,
+      lineStyle: { width: 2 },
+      itemStyle: { color: '#409eff' },
+    })
+  }
+
+  // 添加沪深300
+  if (visibleCurves.value.includes('hs300') && selectedResult.value.benchmark_curves?.hs300) {
+    const hs300Values = selectedResult.value.benchmark_curves.hs300.map((e) => e.value)
+    series.push({
+      name: '沪深300',
+      type: 'line',
+      data: hs300Values,
+      smooth: true,
+      lineStyle: { width: 2 },
+      itemStyle: { color: '#67c23a' },
+    })
+  }
+
   chart.setOption({
     title: {
-      text: '净值曲线',
+      text: '净值曲线对比',
     },
     tooltip: {
       trigger: 'axis',
+    },
+    legend: {
+      data: series.map(s => s.name),
+      top: 10,
     },
     xAxis: {
       type: 'category',
@@ -383,15 +461,9 @@ const renderChart = () => {
     yAxis: {
       type: 'value',
       name: '净值',
+      min: 0,
     },
-    series: [
-      {
-        name: '净值',
-        type: 'line',
-        data: values,
-        smooth: true,
-      },
-    ],
+    series,
   })
 }
 
@@ -400,7 +472,8 @@ const formatDate = (dateStr: string) => {
 }
 
 const getReturnClass = (value: number) => {
-  return value >= 0 ? 'text-success' : 'text-danger'
+  // 红色代表正值，绿色代表负值
+  return value >= 0 ? 'text-danger' : 'text-success'
 }
 
 const handleSortChange = ({ prop, order }: { prop: string; order: string | null }) => {
@@ -410,6 +483,28 @@ const handleSortChange = ({ prop, order }: { prop: string; order: string | null 
 
 const handleSelectionChange = (selection: BacktestResponse[]) => {
   selectedIds.value = selection.map(item => item.id)
+}
+
+const handleDelete = async (result: BacktestResponse) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除回测结果「${result.strategy_name}」吗？`,
+      '删除确认',
+      { type: 'warning' }
+    )
+
+    await backtestStore.deleteResult(result.id)
+    ElMessage.success('删除成功')
+
+    // 如果当前页没有数据了，回到上一页
+    if (pagedResults.value.length === 1 && currentPage.value > 1) {
+      currentPage.value--
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 const handleBatchDelete = async () => {
@@ -453,6 +548,15 @@ const handleBatchDelete = async () => {
   display: flex;
   align-items: center;
   margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
   padding: 12px;
   background-color: #f5f7fa;
   border-radius: 4px;

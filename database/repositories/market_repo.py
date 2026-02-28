@@ -2,7 +2,7 @@
 市场行情数据仓储
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 from pandas import DataFrame
@@ -121,10 +121,18 @@ class MarketDataRepository:
         query = self.db.query(MarketDaily).filter(MarketDaily.asset_id == asset_id)
 
         # 使用日期部分进行比较，避免时间部分的影响
+        # 安全提取日期部分（兼容 datetime 和 date 类型）
+        def to_date(d):
+            if d is None:
+                return None
+            if isinstance(d, date) and not isinstance(d, datetime):
+                return d
+            return d.date()
+
         if start_date:
-            query = query.filter(func.date(MarketDaily.date) >= start_date.date())
+            query = query.filter(func.date(MarketDaily.date) >= to_date(start_date))
         if end_date:
-            query = query.filter(func.date(MarketDaily.date) <= end_date.date())
+            query = query.filter(func.date(MarketDaily.date) <= to_date(end_date))
 
         return query.order_by(MarketDaily.date).all()
 

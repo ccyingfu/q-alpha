@@ -1,20 +1,21 @@
 <template>
   <div class="data-manage">
-    <el-card>
+    <el-card v-loading="isUpdating" :element-loading-text="loadingText">
       <template #header>
         <div class="card-header">
           <span>资产列表</span>
           <div class="header-actions">
             <el-button type="success" @click="handleAdd" :icon="Plus">添加资产</el-button>
-            <el-button type="primary" @click="refreshData">刷新数据</el-button>
+            <el-button type="primary" @click="updateAllData" :disabled="isUpdating">
+              更新数据
+            </el-button>
           </div>
         </div>
       </template>
 
       <!-- 筛选工具栏 -->
       <div class="filter-toolbar">
-        <el-select v-model="filterType" placeholder="类型" clearable style="width: 120px">
-          <el-option label="全部" value="" />
+        <el-select v-model="filterType" placeholder="类型" clearable multiple style="width: 180px" collapse-tags>
           <el-option label="指数" value="index" />
           <el-option label="ETF" value="etf" />
           <el-option label="股票" value="stock" />
@@ -175,8 +176,20 @@ import type { FormInstance, FormRules } from 'element-plus'
 
 const assetStore = useAssetStore()
 
+// 数据更新状态
+const isUpdating = ref(false)
+const loadingText = ref('正在更新数据...')
+const updateStatus = ref({
+  is_updating: false,
+  current: '',
+  total: 0,
+  updated: 0,
+  errors: [] as string[],
+})
+let updateStatusTimer: ReturnType<typeof setInterval> | null = null
+
 // 资产列表筛选
-const filterType = ref<string>('')
+const filterType = ref<string[]>([])
 const searchKeyword = ref('')
 
 // 资产列表分页
@@ -253,9 +266,9 @@ const formRules: FormRules = {
 const filteredAssets = computed(() => {
   let result = assetStore.assets
 
-  // 类型筛选
-  if (filterType.value) {
-    result = result.filter((a) => a.type === filterType.value)
+  // 类型筛选（支持多选）
+  if (filterType.value.length > 0) {
+    result = result.filter((a) => filterType.value.includes(a.type))
   }
 
   // 关键词搜索
@@ -490,6 +503,92 @@ const totalCount = computed(() => filteredData.value.length)
 onMounted(async () => {
   await assetStore.fetchAssets()
 })
+
+// 更新所有资产数据
+const updateAllData = async () => {
+  // 立即显示遮罩层
+  isUpdating.value = true
+  loadingText.value = '正在启动更新任务...'
+
+  try {
+    const response = await marketApi.updateAll() as any
+    // 如果后端返回正在更新状态，不需要重新启动轮询
+    if (response?.status === 'running') {
+      // 已经在运行，直接开始轮询状态
+      startPollingUpdateStatus()
+    } else {
+      // 新任务已启动，开始轮询状态
+      startPollingUpdateStatus()
+    }
+  } catch (error: any) {
+    // 失败时隐藏遮罩层
+    isUpdating.value = false
+    const message = error.response?.data?.detail || error.message || '启动更新失败'
+    ElMessage.error(message)
+  }
+}
+
+// 轮询更新状态
+const startPollingUpdateStatus = () => {
+  if (updateStatusTimer) {
+    clearInterval(updateStatusTimer)
+  }
+
+  updateStatusTimer = setInterval(async () => {
+    try {
+      const status = await marketApi.getUpdateStatus() as any
+      updateStatus.value = status
+
+      // 更新加载文本
+      if (status?.current) {
+        loadingText.value = `正在更新：${status.current} (${status.updated}/${status.total})`
+      }
+
+      if (!status?.is_updating) {
+        // 更新完成
+        stopPollingUpdateStatus()
+        isUpdating.value = false
+
+        const successCount = status?.updated || 0
+        const errorCount = status?.errors?.length || 0
+        const total = status?.total || 0
+        const errors = status?.errors || []
+
+        // 刷新资产列表
+        await assetStore.fetchAssets()
+
+        if (errorCount > 0) {
+          // 显示失败的资产列表
+          ElMessageBox.alert(
+            `<div style="text-align: left;">
+              <p>更新完成：成功 ${successCount}/${total}，失败 ${errorCount} 个</p>
+              <p style="margin-top: 16px; font-weight: bold;">失败的资产：</p>
+              <ul style="margin-top: 8px; padding-left: 20px;">
+                ${errors.map((e: string) => `<li>${e}</li>`).join('')}
+              </ul>
+            </div>`,
+            '更新结果',
+            {
+              dangerouslyUseHTMLString: true,
+              confirmButtonText: '确定',
+            }
+          )
+        } else {
+          ElMessage.success(`数据更新完成！共更新 ${successCount} 个资产`)
+        }
+      }
+    } catch (error) {
+      console.error('获取更新状态失败:', error)
+    }
+  }, 2000) // 每2秒轮询一次
+}
+
+const stopPollingUpdateStatus = () => {
+  if (updateStatusTimer) {
+    clearInterval(updateStatusTimer)
+    updateStatusTimer = null
+  }
+}
 
 const refreshData = async () => {
   try {

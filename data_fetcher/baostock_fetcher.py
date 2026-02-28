@@ -192,10 +192,10 @@ class BaostockFetcher(DataFetcher):
         Returns:
             标准化的 DataFrame
         """
-        # 尝试从缓存获取
+        # 尝试从缓存获取，但需要检查缓存数据是否覆盖请求的日期范围
         if self.cache:
             cached_df = self.cache.get("index", index_code)
-            if cached_df is not None:
+            if cached_df is not None and self._is_cache_sufficient(cached_df, start_date, end_date):
                 logger.info(f"从缓存获取指数数据: {index_code}")
                 return self._filter_by_date(cached_df, start_date, end_date)
 
@@ -266,10 +266,10 @@ class BaostockFetcher(DataFetcher):
         Returns:
             标准化的 DataFrame
         """
-        # 尝试从缓存获取
+        # 尝试从缓存获取，但需要检查缓存数据是否覆盖请求的日期范围
         if self.cache:
             cached_df = self.cache.get("etf", etf_code)
-            if cached_df is not None:
+            if cached_df is not None and self._is_cache_sufficient(cached_df, start_date, end_date):
                 logger.info(f"从缓存获取 ETF 数据: {etf_code}")
                 return self._filter_by_date(cached_df, start_date, end_date)
 
@@ -345,11 +345,11 @@ class BaostockFetcher(DataFetcher):
         Returns:
             标准化的 DataFrame
         """
-        # 尝试从缓存获取
+        # 尝试从缓存获取，但需要检查缓存数据是否覆盖请求的日期范围
         cache_key = f"{stock_code}_{adjust}"
         if self.cache:
             cached_df = self.cache.get("stock", cache_key)
-            if cached_df is not None:
+            if cached_df is not None and self._is_cache_sufficient(cached_df, start_date, end_date):
                 logger.info(f"从缓存获取股票数据: {stock_code}")
                 return self._filter_by_date(cached_df, start_date, end_date)
 
@@ -426,3 +426,34 @@ class BaostockFetcher(DataFetcher):
             df = df[df["date"] <= pd.Timestamp(end_date)]
 
         return df.reset_index(drop=True)
+
+    def _is_cache_sufficient(
+        self,
+        cached_df: pd.DataFrame,
+        start_date: Optional[date],
+        end_date: Optional[date],
+    ) -> bool:
+        """
+        检查缓存数据是否覆盖请求的日期范围
+
+        Args:
+            cached_df: 缓存的数据
+            start_date: 请求的开始日期
+            end_date: 请求的结束日期
+
+        Returns:
+            True 如果缓存数据覆盖请求的范围，False 否则
+        """
+        if cached_df is None or cached_df.empty:
+            return False
+
+        cached_start = cached_df["date"].min()
+        cached_end = cached_df["date"].max()
+
+        # 检查请求的日期范围是否在缓存范围内
+        if start_date is not None and pd.Timestamp(start_date) < cached_start:
+            return False
+        if end_date is not None and pd.Timestamp(end_date) > cached_end:
+            return False
+
+        return True

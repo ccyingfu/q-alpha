@@ -4,8 +4,8 @@
 计算各种投资绩效指标。
 """
 
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, date
+from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -46,7 +46,7 @@ class MetricsCalculator:
         return total_return
 
     def calculate_annual_return(
-        self, equity_curve: pd.Series, start_date: datetime, end_date: datetime
+        self, equity_curve: pd.Series, start_date: Union[datetime, date], end_date: Union[datetime, date]
     ) -> float:
         """
         计算年化收益率 (CAGR)
@@ -65,8 +65,17 @@ class MetricsCalculator:
         # 计算总收益率
         total_return = self.calculate_total_return(equity_curve)
 
-        # 计算年数
-        days = (end_date - start_date).days
+        # 统一转换为 date 类型
+        if isinstance(start_date, datetime):
+            start_date_only = start_date.date()
+        else:
+            start_date_only = start_date
+        if isinstance(end_date, datetime):
+            end_date_only = end_date.date()
+        else:
+            end_date_only = end_date
+
+        days = (end_date_only - start_date_only).days
         years = days / 365.25
 
         if years <= 0:
@@ -100,7 +109,7 @@ class MetricsCalculator:
         return max_drawdown
 
     def calculate_drawdown_curve(
-        self, equity_curve: pd.Series, dates: Optional[List[datetime]] = None
+        self, equity_curve: pd.Series, dates: Optional[List[Union[datetime, date]]] = None
     ) -> List[dict]:
         """
         计算回撤曲线
@@ -123,10 +132,10 @@ class MetricsCalculator:
 
         # 转换为输出格式
         if dates is not None:
-            # 使用提供的日期列表
+            # 使用提供的日期列表，兼容 datetime 和 date 类型
             return [
-                {"date": dates[i].strftime("%Y-%m-%d"), "value": float(drawdown.iloc[i])}
-                for i in range(len(drawdown))
+                {"date": d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d), "value": float(drawdown.iloc[i])}
+                for i, d in enumerate(dates)
             ]
 
         # 使用整数索引转换为字符串
@@ -246,8 +255,8 @@ class MetricsCalculator:
     def calculate_all_metrics(
         self,
         equity_curve: pd.Series,
-        start_date: datetime,
-        end_date: datetime,
+        start_date: Union[datetime, date],
+        end_date: Union[datetime, date],
     ) -> dict:
         """
         计算所有绩效指标

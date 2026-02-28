@@ -142,6 +142,12 @@ export const marketApi = {
     api.get<MarketDataResponse>(`/api/market/${assetCode}/daily`, {
       params: { start_date: startDate, end_date: endDate, refresh },
     }),
+
+  // 更新所有资产数据
+  updateAll: () => api.post<{ message: string; status: string; total: number }>('/api/market/update-all'),
+
+  // 获取更新状态
+  getUpdateStatus: () => api.get<{ is_updating: boolean; current: string; total: number; updated: number; errors: string[] }>('/api/market/update-status'),
 }
 
 export default api

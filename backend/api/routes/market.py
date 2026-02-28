@@ -2,10 +2,10 @@
 市场行情数据接口
 """
 
-from datetime import datetime
-from typing import Optional
+from datetime import date, datetime
+from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from database.connection import get_db
@@ -15,6 +15,102 @@ from backend.schemas import MarketDataResponse, MarketDataPoint
 from data_fetcher import BaostockFetcher
 
 router = APIRouter()
+
+
+# 全局更新状态
+_update_status = {"is_updating": False, "current": "", "total": 0, "updated": 0, "errors": []}
+
+
+@router.post("/update-all")
+async def update_all_data(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    更新所有资产的市场数据（后台任务）
+    """
+    global _update_status
+
+    if _update_status["is_updating"]:
+        return {"message": "数据更新任务正在进行中", "status": "running"}
+
+    # 获取所有资产
+    asset_repo = AssetRepository(db)
+    assets = asset_repo.get_all()
+
+    if not assets:
+        raise HTTPException(status_code=404, detail="没有找到任何资产")
+
+    # 重置状态
+    _update_status = {
+        "is_updating": True,
+        "current": "",
+        "total": len(assets),
+        "updated": 0,
+        "errors": []
+    }
+
+    # 添加后台任务
+    background_tasks.add_task(_update_all_assets_task, assets)
+
+    return {
+        "message": f"开始更新 {len(assets)} 个资产的数据",
+        "status": "started",
+        "total": len(assets)
+    }
+
+
+@router.get("/update-status")
+async def get_update_status():
+    """
+    获取数据更新状态
+    """
+    return _update_status
+
+
+async def _update_all_assets_task(assets: List[Asset]):
+    """
+    后台任务：更新所有资产数据
+    """
+    global _update_status
+    fetcher = BaostockFetcher()
+
+    from database.connection import SessionLocal
+    db = SessionLocal()
+
+    try:
+        asset_repo = AssetRepository(db)
+        market_repo = MarketDataRepository(db)
+
+        for i, asset in enumerate(assets):
+            try:
+                _update_status["current"] = f"{asset.code} - {asset.name}"
+
+                # 获取数据（使用默认日期范围获取全部历史数据）
+                if asset.type == "index":
+                    df = fetcher.fetch_index_daily(asset.code)
+                elif asset.type == "etf":
+                    df = fetcher.fetch_etf_daily(asset.code)
+                elif asset.type == "stock":
+                    df = fetcher.fetch_stock_daily(asset.code)
+                else:
+                    _update_status["errors"].append(f"{asset.code}: 不支持的资产类型 {asset.type}")
+                    continue
+
+                if not df.empty:
+                    # 删除旧数据并插入新数据
+                    market_repo.delete_by_asset(asset.id)
+                    market_repo.bulk_create_from_df(df, asset.id)
+                    _update_status["updated"] += 1
+
+            except Exception as e:
+                _update_status["errors"].append(f"{asset.code}: {str(e)}")
+
+            _update_status["total"] = len(assets)
+
+    finally:
+        db.close()
+        _update_status["is_updating"] = False
 
 
 @router.get("/{asset_code}/daily", response_model=MarketDataResponse)
@@ -61,25 +157,21 @@ async def get_market_daily(
     if not market_data or refresh:
         fetcher = BaostockFetcher()
 
+        # 安全提取日期部分（兼容 datetime 和 date 类型）
+        def to_date(d):
+            if d is None:
+                return None
+            if isinstance(d, date) and not isinstance(d, datetime):
+                return d
+            return d.date()
+
         # 根据资产类型选择获取方法
         if asset.type == "index":
-            df = fetcher.fetch_index_daily(
-                asset_code,
-                start_date.date() if start_date else None,
-                end_date.date() if end_date else None,
-            )
+            df = fetcher.fetch_index_daily(asset_code, to_date(start_date), to_date(end_date))
         elif asset.type == "etf":
-            df = fetcher.fetch_etf_daily(
-                asset_code,
-                start_date.date() if start_date else None,
-                end_date.date() if end_date else None,
-            )
+            df = fetcher.fetch_etf_daily(asset_code, to_date(start_date), to_date(end_date))
         elif asset.type == "stock":
-            df = fetcher.fetch_stock_daily(
-                asset_code,
-                start_date.date() if start_date else None,
-                end_date.date() if end_date else None,
-            )
+            df = fetcher.fetch_stock_daily(asset_code, to_date(start_date), to_date(end_date))
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported asset type: {asset.type}")
 

@@ -2,6 +2,7 @@
 回测执行接口
 """
 
+from datetime import date, datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -52,33 +53,43 @@ async def run_backtest(
                 status_code=404, detail=f"Asset {asset_code} not found in database"
             )
 
-        # 检查数据库中是否有该资产的数据
+        # 检查数据库中是否有该资产的数据，并检查数据是否完整
         existing_data = market_repo.get_by_asset(
             asset.id, request.start_date, request.end_date
         )
 
-        # 如果没有数据，自动获取
+        # 检查数据是否需要刷新
+        need_refresh = False
         if not existing_data:
+            need_refresh = True
+        else:
+            # 检查数据的最新日期是否覆盖请求的结束日期
+            # 允许一定的容忍度（考虑到数据源可能有1-2天的延迟）
+            from datetime import timedelta
+            latest_date = max(d.date for d in existing_data)
+            # 确保 latest_date 是 date 类型
+            if isinstance(latest_date, datetime):
+                latest_date = latest_date.date()
+            # 安全提取 date 类型
+            request_end = request.end_date if isinstance(request.end_date, date) and not isinstance(request.end_date, datetime) else request.end_date.date()
+            # 如果最新数据早于请求结束日期超过7天，需要刷新
+            if (request_end - latest_date) > timedelta(days=7):
+                need_refresh = True
+
+        # 如果没有数据或数据不完整，自动获取
+        if need_refresh:
             try:
                 # 根据资产类型选择获取方法
+                # 安全提取日期部分
+                start = request.start_date if isinstance(request.start_date, date) and not isinstance(request.start_date, datetime) else request.start_date.date()
+                end = request.end_date if isinstance(request.end_date, date) and not isinstance(request.end_date, datetime) else request.end_date.date()
+
                 if asset.type == "index":
-                    df = fetcher.fetch_index_daily(
-                        asset_code,
-                        request.start_date.date(),
-                        request.end_date.date(),
-                    )
+                    df = fetcher.fetch_index_daily(asset_code, start, end)
                 elif asset.type == "etf":
-                    df = fetcher.fetch_etf_daily(
-                        asset_code,
-                        request.start_date.date(),
-                        request.end_date.date(),
-                    )
+                    df = fetcher.fetch_etf_daily(asset_code, start, end)
                 elif asset.type == "stock":
-                    df = fetcher.fetch_stock_daily(
-                        asset_code,
-                        request.start_date.date(),
-                        request.end_date.date(),
-                    )
+                    df = fetcher.fetch_stock_daily(asset_code, start, end)
                 else:
                     raise HTTPException(
                         status_code=400, detail=f"Unsupported asset type: {asset.type}"
@@ -91,7 +102,8 @@ async def run_backtest(
                         detail=f"未获取到 {asset_code}({asset.name}) 的市场数据，请检查资产代码或日期范围"
                     )
 
-                # 存储到数据库
+                # 删除旧数据再存储新数据（避免重复）
+                market_repo.delete_by_asset(asset.id)
                 market_repo.bulk_create_from_df(df, asset.id)
 
             except HTTPException:
@@ -148,6 +160,7 @@ async def run_backtest(
         },
         equity_curve=saved_result.equity_curve,
         drawdown_curve=saved_result.drawdown_curve,
+        benchmark_curves=saved_result.benchmark_curves,
         created_at=saved_result.created_at,
     )
 
@@ -195,6 +208,7 @@ async def list_backtests(
                 },
                 equity_curve=result.equity_curve,
                 drawdown_curve=result.drawdown_curve,
+                benchmark_curves=result.benchmark_curves,
                 created_at=result.created_at,
             )
         )
@@ -237,6 +251,7 @@ async def get_backtest_result(
         },
         equity_curve=result.equity_curve,
         drawdown_curve=result.drawdown_curve,
+        benchmark_curves=result.benchmark_curves,
         created_at=result.created_at,
     )
 

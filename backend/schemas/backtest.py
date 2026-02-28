@@ -60,6 +60,9 @@ class BacktestResponse(BaseModel):
     # 数据序列
     equity_curve: List[Dict[str, Union[str, float]]] = Field(..., description="净值序列")
     drawdown_curve: List[Dict[str, Union[str, float]]] = Field(..., description="回撤序列")
+    benchmark_curves: Optional[Dict[str, List[Dict[str, Union[str, float]]]]] = Field(
+        None, description="基准指数序列 (sh=上证指数, hs300=沪深300)"
+    )
 
     # 时间戳
     created_at: datetime

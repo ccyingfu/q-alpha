@@ -53,6 +53,10 @@ class BacktestResult(Base):
     # 回撤序列（JSON 格式）
     drawdown_curve: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
+    # 基准指数曲线（JSON 格式）
+    # 示例：{"sh": {"date": "2020-01-01", "value": 100000.0}, "hs300": {...}}
+    benchmark_curves: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
