@@ -1,0 +1,50 @@
+[
+  {
+    "code": "000300",
+    "name": "沪深300",
+    "type": "index",
+    "description": "沪深300指数，反映中国A股市场整体表现的核心指数"
+  },
+  {
+    "code": "000905",
+    "name": "中证500",
+    "type": "index",
+    "description": "中证500指数，反映中国A股市场中小盘股票表现"
+  },
+  {
+    "code": "399006",
+    "name": "创业板指",
+    "type": "index",
+    "description": "创业板指数，反映创业板股票表现"
+  },
+  {
+    "code": "000016",
+    "name": "上证50",
+    "type": "index",
+    "description": "上证50指数，反映上海证券交易所大盘蓝筹股表现"
+  },
+  {
+    "code": "518880",
+    "name": "黄金ETF",
+    "type": "etf",
+    "description": "华安黄金易ETF，追踪国内黄金价格"
+  },
+  {
+    "code": "510300",
+    "name": "沪深300ETF",
+    "type": "etf",
+    "description": "华泰柏瑞沪深300ETF，追踪沪深300指数"
+  },
+  {
+    "code": "159915",
+    "name": "创业板ETF",
+    "type": "etf",
+    "description": "易方达创业板ETF，追踪创业板指数"
+  },
+  {
+    "code": "510500",
+    "name": "中证500ETF",
+    "type": "etf",
+    "description": "南方中证500ETF，追踪中证500指数"
+  }
+]

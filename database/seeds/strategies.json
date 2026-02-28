@@ -1,0 +1,42 @@
+[
+  {
+    "name": "保守型策略",
+    "description": "以债券和大盘股为主，追求稳健收益",
+    "allocation": {
+      "000300": 0.5,
+      "518880": 0.3,
+      "000016": 0.2
+    },
+    "rebalance_type": "quarterly"
+  },
+  {
+    "name": "平衡型策略",
+    "description": "股债平衡，攻守兼备",
+    "allocation": {
+      "000300": 0.4,
+      "000905": 0.3,
+      "518880": 0.2,
+      "399006": 0.1
+    },
+    "rebalance_type": "monthly"
+  },
+  {
+    "name": "激进型策略",
+    "description": "以成长股为主，追求高收益",
+    "allocation": {
+      "399006": 0.4,
+      "000905": 0.4,
+      "518880": 0.2
+    },
+    "rebalance_type": "monthly"
+  },
+  {
+    "name": "60/40 股债平衡",
+    "description": "经典的60%股票40%黄金配置",
+    "allocation": {
+      "000300": 0.6,
+      "518880": 0.4
+    },
+    "rebalance_type": "yearly"
+  }
+]
