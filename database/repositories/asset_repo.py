@@ -118,3 +118,24 @@ class AssetRepository:
         self.db.bulk_save_objects(assets)
         self.db.commit()
         return assets
+
+    def search(self, query: str, asset_type: Optional[AssetType] = None, limit: int = 10) -> List[Asset]:
+        """
+        搜索资产（按代码或名称模糊匹配）
+
+        Args:
+            query: 查询字符串
+            asset_type: 资产类型过滤（可选）
+            limit: 返回结果数量限制
+
+        Returns:
+            匹配的资产列表
+        """
+        query_filter = self.db.query(Asset).filter(
+            (Asset.code.ilike(f"%{query}%")) | (Asset.name.ilike(f"%{query}%"))
+        )
+
+        if asset_type:
+            query_filter = query_filter.filter(Asset.type == asset_type)
+
+        return query_filter.limit(limit).all()

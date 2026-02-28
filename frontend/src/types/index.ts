@@ -16,6 +16,14 @@ export interface Asset {
   updated_at: string
 }
 
+// 外部资产搜索结果
+export interface ExternalAssetSearchResult {
+  code: string
+  name: string
+  type: AssetType
+  source: string
+}
+
 // 再平衡类型
 export type RebalanceType = 'monthly' | 'quarterly' | 'yearly' | 'threshold'
 

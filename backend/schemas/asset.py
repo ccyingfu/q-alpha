@@ -39,3 +39,12 @@ class AssetResponse(AssetBase):
 
     class Config:
         from_attributes = True
+
+
+class ExternalAssetSearchResult(BaseModel):
+    """外部资产搜索结果"""
+
+    code: str = Field(..., description="资产代码")
+    name: str = Field(..., description="资产名称")
+    type: str = Field(..., description="建议的资产类型")
+    source: str = Field(..., description="数据来源")

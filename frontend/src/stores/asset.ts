@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { assetApi } from '../api/client'
-import type { Asset } from '../types'
+import type { Asset, ExternalAssetSearchResult } from '../types'
 
 export const useAssetStore = defineStore('asset', () => {
   const assets = ref<Asset[]>([])
@@ -54,6 +54,34 @@ export const useAssetStore = defineStore('asset', () => {
     }
   }
 
+  // 搜索资产
+  const searchAssets = async (query: string, type?: string) => {
+    loading.value = true
+    error.value = null
+    try {
+      return await assetApi.search(query, type)
+    } catch (e: any) {
+      error.value = e.message || '搜索资产失败'
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 外部搜索资产（从 akshare 等数据源）
+  const searchAssetsExternal = async (query: string, type?: string) => {
+    loading.value = true
+    error.value = null
+    try {
+      return await assetApi.searchExternal(query, type)
+    } catch (e: any) {
+      error.value = e.message || '外部搜索资产失败'
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 更新资产
   const updateAsset = async (id: number, data: Partial<Asset>) => {
     loading.value = true
@@ -97,5 +125,7 @@ export const useAssetStore = defineStore('asset', () => {
     createAsset,
     updateAsset,
     deleteAsset,
+    searchAssets,
+    searchAssetsExternal,
   }
 })

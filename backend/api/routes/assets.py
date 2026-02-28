@@ -2,7 +2,7 @@
 资产管理接口
 """
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -11,8 +11,63 @@ from database.connection import get_db
 from database.repositories import AssetRepository
 from database.models import Asset, AssetType
 from backend.schemas import AssetCreate, AssetResponse, AssetUpdate
+from backend.schemas.asset import ExternalAssetSearchResult
+from backend.services.external_asset_service import ExternalAssetService
 
 router = APIRouter()
+
+
+@router.get("/search", response_model=List[AssetResponse])
+async def search_assets(
+    q: str,
+    asset_type: str = None,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    """
+    搜索资产（按代码或名称模糊匹配）
+
+    Args:
+        q: 查询字符串
+        asset_type: 资产类型过滤（可选）
+        limit: 返回结果数量限制，默认10条
+    """
+    if not q or not q.strip():
+        return []
+
+    repo = AssetRepository(db)
+
+    # 解析资产类型
+    type_filter = None
+    if asset_type:
+        try:
+            type_filter = AssetType(asset_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid asset type: {asset_type}")
+
+    assets = repo.search(q.strip(), type_filter, limit)
+    return assets
+
+
+@router.get("/search-external", response_model=List[ExternalAssetSearchResult])
+async def search_assets_external(
+    q: str,
+    asset_type: Optional[str] = None,
+    limit: int = 10,
+):
+    """
+    从外部数据源搜索资产（akshare）
+
+    Args:
+        q: 查询字符串（代码或名称）
+        asset_type: 资产类型过滤（可选）
+        limit: 返回结果数量限制，默认10条
+    """
+    if not q or not q.strip():
+        return []
+
+    results = ExternalAssetService.search(q.strip(), asset_type, limit)
+    return results
 
 
 @router.get("/", response_model=List[AssetResponse])

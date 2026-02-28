@@ -3,7 +3,7 @@
  */
 
 import axios from 'axios'
-import type { Asset, Strategy, BacktestRequest, BacktestResponse, MarketDataResponse } from '../types'
+import type { Asset, ExternalAssetSearchResult, Strategy, BacktestRequest, BacktestResponse, MarketDataResponse } from '../types'
 
 // API 基础 URL
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -40,6 +40,16 @@ api.interceptors.response.use(
 
 // 资产相关 API
 export const assetApi = {
+  // 外部搜索资产（从 akshare 等数据源）
+  searchExternal: (query: string, type?: string, limit = 10) =>
+    api.get<ExternalAssetSearchResult[]>('/api/assets/search-external', {
+      params: { q: query, asset_type: type, limit },
+    }),
+
+  // 搜索资产（数据库）
+  search: (query: string, type?: string, limit = 10) =>
+    api.get<Asset[]>('/api/assets/search', { params: { q: query, asset_type: type, limit } }),
+
   // 获取所有资产
   list: (type?: string) =>
     api.get<Asset[]>('/api/assets/', { params: { asset_type: type } }),
