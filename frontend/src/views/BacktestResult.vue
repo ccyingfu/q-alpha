@@ -129,23 +129,55 @@
 
       <!-- 指标统计 -->
       <el-row :gutter="20" class="metrics-row">
-        <el-col :span="4.8">
+        <el-col :span="3.4">
           <div class="date-range-statistic">
-            <div class="statistic-title">时间范围</div>
-            <div class="statistic-value">{{ formatDotDate(selectedResult.start_date) }} 到 {{ formatDotDate(selectedResult.end_date) }}</div>
+            <div class="statistic-title">策略</div>
+            <div class="statistic-value neutral">{{ selectedResult.strategy_name }}</div>
           </div>
         </el-col>
-        <el-col :span="4.8">
-          <el-statistic title="总收益率" :value="selectedResult.metrics.total_return * 100" :precision="2" suffix="%" />
+        <el-col :span="3.4">
+          <div class="date-range-statistic">
+            <div class="statistic-title">再平衡方式</div>
+            <div class="statistic-value neutral">{{ currentRebalanceType }}</div>
+          </div>
         </el-col>
-        <el-col :span="4.8">
-          <el-statistic title="年化收益率" :value="selectedResult.metrics.annual_return * 100" :precision="2" suffix="%" />
+        <el-col :span="3.4">
+          <div class="date-range-statistic">
+            <div class="statistic-title">总收益率</div>
+            <div class="statistic-value" :class="selectedResult.metrics.total_return >= 0 ? 'positive' : 'negative'">
+              {{ (selectedResult.metrics.total_return * 100).toFixed(2) }}%
+            </div>
+          </div>
         </el-col>
-        <el-col :span="4.8">
-          <el-statistic title="最大回撤" :value="selectedResult.metrics.max_drawdown * 100" :precision="2" suffix="%" />
+        <el-col :span="3.4">
+          <div class="date-range-statistic">
+            <div class="statistic-title">年化收益率</div>
+            <div class="statistic-value" :class="selectedResult.metrics.annual_return >= 0 ? 'positive' : 'negative'">
+              {{ (selectedResult.metrics.annual_return * 100).toFixed(2) }}%
+            </div>
+          </div>
         </el-col>
-        <el-col :span="4.8">
-          <el-statistic title="夏普比率" :value="selectedResult.metrics.sharpe_ratio" :precision="2" />
+        <el-col :span="3.4">
+          <div class="date-range-statistic">
+            <div class="statistic-title">最大回撤</div>
+            <div class="statistic-value negative">
+              {{ (selectedResult.metrics.max_drawdown * 100).toFixed(2) }}%
+            </div>
+          </div>
+        </el-col>
+        <el-col :span="3.4">
+          <div class="date-range-statistic">
+            <div class="statistic-title">夏普比率</div>
+            <div class="statistic-value neutral">
+              {{ selectedResult.metrics.sharpe_ratio?.toFixed(2) || '-' }}
+            </div>
+          </div>
+        </el-col>
+        <el-col :span="3.4">
+          <div class="date-range-statistic">
+            <div class="statistic-title">时间范围</div>
+            <div class="statistic-value neutral time-value">{{ formatDotDate(selectedResult.start_date) }} 到 {{ formatDotDate(selectedResult.end_date) }}</div>
+          </div>
         </el-col>
       </el-row>
 
@@ -339,6 +371,22 @@ const assetColors: Record<string, string> = {
 const getAssetColor = (code: string): string => {
   return assetColors[code] || `hsl(${Math.abs(code.charCodeAt(0) * 17) % 360}, 70%, 50%)`
 }
+
+// 再平衡类型中文映射
+const rebalanceTypeMap: Record<string, string> = {
+  monthly: '按月',
+  quarterly: '按季度',
+  yearly: '按年',
+  threshold: '阈值触发',
+}
+
+// 获取当前策略的再平衡方式
+const currentRebalanceType = computed(() => {
+  if (!selectedResult.value) return '-'
+  const strategy = strategyStore.strategies.find(s => s.id === selectedResult.value?.strategy_id)
+  if (!strategy) return '-'
+  return rebalanceTypeMap[strategy.rebalance_type] || '-'
+})
 
 // 资产配置数据（含动态净值）
 const assetAllocationData = computed(() => {
@@ -909,9 +957,25 @@ const handleBatchDelete = async () => {
 }
 
 .statistic-value {
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 400;
   color: #303133;
+}
+
+.statistic-value.positive {
+  color: #f56c6c;
+}
+
+.statistic-value.negative {
+  color: #67c23a;
+}
+
+.statistic-value.neutral {
+  color: #303133;
+}
+
+.statistic-value.time-value {
+  font-size: 12px;
 }
 
 /* 高亮行样式 */
