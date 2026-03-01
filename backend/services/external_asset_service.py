@@ -1,14 +1,16 @@
 """
 外部资产搜索服务
 
-使用 akshare 等数据源从外部查询资产信息。
+使用 Baostock 从外部查询资产信息。
+Baostock 是证券宝提供的免费数据接口，无需注册、无限制调用。
 """
 
 import logging
 import re
 from typing import List, Optional
 
-import akshare as ak
+import baostock as bs
+import pandas as pd
 
 from backend.schemas.asset import ExternalAssetSearchResult
 
@@ -16,33 +18,32 @@ logger = logging.getLogger(__name__)
 
 
 class ExternalAssetService:
-    """外部资产搜索服务"""
+    """外部资产搜索服务（基于 Baostock）"""
 
-    # A股代码前缀规则
-    STOCK_CODE_PREFIXES = {
-        "0": "stock",  # 深圳主板
-        "2": "stock",  # 深圳B股
-        "3": "stock",  # 创业板
-        "6": "stock",  # 上海主板
-        "8": "stock",  # 上海B股
-    }
+    # 类级别的登录状态管理
+    _login_count = 0
 
-    # 指数代码规则
-    INDEX_CODE_PREFIXES = {
-        "000": "index",  # 深证指数
-        "001": "index",  # 国证指数
-        "399": "index",  # 深证指数
-        "000300": "index",  # 沪深300
-        "000905": "index",  # 中证500
-    }
+    @classmethod
+    def _ensure_login(cls):
+        """确保已登录 Baostock"""
+        if cls._login_count == 0:
+            lg = bs.login()
+            if lg.error_code != "0":
+                raise RuntimeError(f"Baostock 登录失败: {lg.error_msg}")
+            logger.info("Baostock 登录成功（搜索服务）")
+        cls._login_count += 1
 
-    # ETF代码规则
-    ETF_CODE_PREFIXES = {
-        "5": "etf",  # 上海ETF
-        "15": "etf",  # 深圳ETF
-        "56": "etf",  # 深圳ETF
-        "159": "etf",  # 深圳ETF
-    }
+    @classmethod
+    def _safe_logout(cls):
+        """安全登出 Baostock"""
+        if cls._login_count > 0:
+            cls._login_count -= 1
+            if cls._login_count == 0:
+                try:
+                    bs.logout()
+                    logger.info("Baostock 登出成功（搜索服务）")
+                except Exception as e:
+                    logger.warning(f"Baostock 登出时出现警告: {e}")
 
     @staticmethod
     def _guess_asset_type(code: str) -> str:
@@ -55,7 +56,7 @@ class ExternalAssetService:
         Returns:
             资产类型
         """
-        code = code.strip().upper()
+        code = code.strip()
 
         # ETF 判断
         if code.startswith("5") or code.startswith("15") or code.startswith("56") or code.startswith("159"):
@@ -69,9 +70,38 @@ class ExternalAssetService:
         return "stock"
 
     @staticmethod
+    def _normalize_code(code: str) -> str:
+        """
+        规范化资产代码，去除市场前缀
+
+        Args:
+            code: 原始代码（如 sh.600745 或 sh600745）
+
+        Returns:
+            规范化后的纯数字代码（如 600745）
+        """
+        code = code.strip()
+        
+        # 去除带点号的市场前缀（如 sh.600745 -> 600745）
+        dot_prefixes = ["sh.", "sz.", "bj.", "SH.", "SZ.", "BJ."]
+        for prefix in dot_prefixes:
+            if code.upper().startswith(prefix.upper()):
+                code = code[len(prefix):]
+                return code
+        
+        # 去除不带点号的市场前缀（如 sh600745 -> 600745）
+        prefixes = ["sh", "sz", "bj", "SH", "SZ", "BJ"]
+        for prefix in prefixes:
+            if code.lower().startswith(prefix.lower()):
+                code = code[len(prefix):]
+                break
+        
+        return code
+
+    @staticmethod
     def search_stocks(query: str, limit: int = 10) -> List[ExternalAssetSearchResult]:
         """
-        搜索股票信息
+        搜索股票信息（使用 Baostock）
 
         Args:
             query: 查询字符串（代码或名称）
@@ -81,37 +111,56 @@ class ExternalAssetService:
             搜索结果列表
         """
         try:
+            ExternalAssetService._ensure_login()
+
             # 获取所有A股列表
-            df = ak.stock_info_a_code_name()
+            rs = bs.query_stock_basic()
+
+            if rs.error_code != "0":
+                logger.error(f"Baostock 查询股票列表失败: {rs.error_msg}")
+                return []
+
+            # 转换为 DataFrame
+            data_list = []
+            while (rs.error_code == "0") & rs.next():
+                data_list.append(rs.get_row_data())
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
 
             # 按代码或名称搜索
+            query_upper = query.upper()
             if query.isdigit():
                 # 纯数字，按代码搜索
                 results = df[df["code"].str.contains(query, na=False)]
             else:
-                # 按名称搜索
-                results = df[df["name"].str.contains(query, na=False)]
+                # 按名称或代码搜索
+                results = df[
+                    df["code"].str.contains(query_upper, na=False) |
+                    df["code_name"].str.contains(query, na=False)
+                ]
 
             # 限制结果数量
             results = results.head(limit)
 
             return [
                 ExternalAssetSearchResult(
-                    code=row["code"],
-                    name=row["name"],
+                    code=ExternalAssetService._normalize_code(row["code"]),
+                    name=row["code_name"],
                     type=ExternalAssetService._guess_asset_type(row["code"]),
-                    source="akshare",
+                    source="baostock",
                 )
                 for _, row in results.iterrows()
             ]
         except Exception as e:
             logger.error(f"搜索股票失败: {query}, 错误: {e}")
             return []
+        finally:
+            ExternalAssetService._safe_logout()
 
     @staticmethod
     def search_indices(query: str, limit: int = 10) -> List[ExternalAssetSearchResult]:
         """
-        搜索指数信息
+        搜索指数信息（使用 Baostock）
 
         Args:
             query: 查询字符串
@@ -121,34 +170,55 @@ class ExternalAssetService:
             搜索结果列表
         """
         try:
-            # 获取指数列表
-            df = ak.index_stock_info()
+            ExternalAssetService._ensure_login()
+
+            # Baostock 获取所有证券列表，然后过滤指数
+            rs = bs.query_stock_basic()
+
+            if rs.error_code != "0":
+                logger.error(f"Baostock 查询指数列表失败: {rs.error_msg}")
+                return []
+
+            # 转换为 DataFrame
+            data_list = []
+            while (rs.error_code == "0") & rs.next():
+                data_list.append(rs.get_row_data())
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
+
+            # 指数代码通常以 000, 399 开头
+            index_df = df[df["code"].str.match(r"^(sh\.(000|88|98)|sz\.(399|99))", na=False)]
 
             # 按代码或名称搜索
             if query.isdigit():
-                results = df[df["index_code"].str.contains(query, na=False)]
+                results = index_df[index_df["code"].str.contains(query, na=False)]
             else:
-                results = df[df["index_name"].str.contains(query, na=False)]
+                results = index_df[
+                    index_df["code"].str.contains(query.upper(), na=False) |
+                    index_df["code_name"].str.contains(query, na=False)
+                ]
 
             results = results.head(limit)
 
             return [
                 ExternalAssetSearchResult(
-                    code=row["index_code"],
-                    name=row["index_name"],
+                    code=ExternalAssetService._normalize_code(row["code"]),
+                    name=row["code_name"],
                     type="index",
-                    source="akshare",
+                    source="baostock",
                 )
                 for _, row in results.iterrows()
             ]
         except Exception as e:
             logger.error(f"搜索指数失败: {query}, 错误: {e}")
             return []
+        finally:
+            ExternalAssetService._safe_logout()
 
     @staticmethod
     def search_etfs(query: str, limit: int = 10) -> List[ExternalAssetSearchResult]:
         """
-        搜索 ETF 信息
+        搜索 ETF 信息（使用 Baostock）
 
         Args:
             query: 查询字符串
@@ -158,29 +228,50 @@ class ExternalAssetService:
             搜索结果列表
         """
         try:
-            # 获取ETF列表
-            df = ak.fund_etf_category_sina(symbol="ETF基金")
+            ExternalAssetService._ensure_login()
+
+            # Baostock 获取所有证券列表，然后过滤 ETF
+            rs = bs.query_stock_basic()
+
+            if rs.error_code != "0":
+                logger.error(f"Baostock 查询ETF列表失败: {rs.error_msg}")
+                return []
+
+            # 转换为 DataFrame
+            data_list = []
+            while (rs.error_code == "0") & rs.next():
+                data_list.append(rs.get_row_data())
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
+
+            # ETF 代码通常以 51, 52, 15, 16, 56, 159 开头
+            etf_df = df[df["code"].str.match(r"^(sh\.(5[0-9])|sz\.(15|16|159|56))", na=False)]
 
             # 按代码或名称搜索
             if query.isdigit():
-                results = df[df["代码"].str.contains(query, na=False)]
+                results = etf_df[etf_df["code"].str.contains(query, na=False)]
             else:
-                results = df[df["名称"].str.contains(query, na=False)]
+                results = etf_df[
+                    etf_df["code"].str.contains(query.upper(), na=False) |
+                    etf_df["code_name"].str.contains(query, na=False)
+                ]
 
             results = results.head(limit)
 
             return [
                 ExternalAssetSearchResult(
-                    code=row["代码"],
-                    name=row["名称"],
+                    code=ExternalAssetService._normalize_code(row["code"]),
+                    name=row["code_name"],
                     type="etf",
-                    source="akshare",
+                    source="baostock",
                 )
                 for _, row in results.iterrows()
             ]
         except Exception as e:
             logger.error(f"搜索ETF失败: {query}, 错误: {e}")
             return []
+        finally:
+            ExternalAssetService._safe_logout()
 
     @staticmethod
     def search(query: str, asset_type: Optional[str] = None, limit: int = 10) -> List[ExternalAssetSearchResult]:

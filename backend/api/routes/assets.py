@@ -56,7 +56,7 @@ async def search_assets_external(
     limit: int = 10,
 ):
     """
-    从外部数据源搜索资产（akshare）
+    从外部数据源搜索资产（Baostock）
 
     Args:
         q: 查询字符串（代码或名称）

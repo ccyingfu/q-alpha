@@ -1,6 +1,6 @@
 # Data Fetcher 模块
 
-数据获取模块，负责从 AKShare 等数据源获取金融数据。
+数据获取模块，负责从 Baostock 数据源获取金融数据。
 
 ## 功能特性
 
@@ -15,11 +15,11 @@
 ### 基本使用
 
 ```python
-from data_fetcher import AKShareFetcher, FetcherConfig
+from data_fetcher import BaostockFetcher, FetcherConfig
 from datetime import date
 
 # 创建获取器实例
-fetcher = AKShareFetcher()
+fetcher = BaostockFetcher()
 
 # 获取沪深300指数数据
 df = fetcher.fetch_index_daily(
@@ -40,14 +40,14 @@ config = FetcherConfig(
     enable_cache=True,
 )
 
-fetcher = AKShareFetcher(config=config)
+fetcher = BaostockFetcher(config=config)
 ```
 
 ### 禁用缓存
 
 ```python
 config = FetcherConfig(enable_cache=False)
-fetcher = AKShareFetcher(config=config)
+fetcher = BaostockFetcher(config=config)
 ```
 
 ## API 文档
@@ -162,6 +162,6 @@ pytest tests/
 
 ## 注意事项
 
-1. AKShare 接口可能不稳定，已内置重试机制
+1. Baostock 接口需要先登录再查询，已内置登录管理
 2. 缓存默认存储在 `./data/cache` 目录
 3. 首次获取数据较慢，建议启用缓存

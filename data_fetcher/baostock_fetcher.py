@@ -113,13 +113,20 @@ class BaostockFetcher(DataFetcher):
         Returns:
             Baostock 格式代码，如 "sh.000300"
         """
+        # 去除可能的市场前缀并规范化
+        code = index_code.strip().lower()
+        for prefix in ["sh.", "sz.", "bj."]:
+            if code.startswith(prefix):
+                code = code[len(prefix):]
+                break
+
         # 检查是否已经是 Baostock 格式
-        if "." in index_code:
-            return index_code
+        if "." in code:
+            return code
 
         # 根据代码前缀判断市场
-        prefix = self.INDEX_PREFIX.get(index_code, "sh")
-        return f"{prefix}.{index_code}"
+        prefix = self.INDEX_PREFIX.get(code, "sh")
+        return f"{prefix}.{code}"
 
     def _convert_etf_code(self, etf_code: str) -> str:
         """
@@ -131,12 +138,19 @@ class BaostockFetcher(DataFetcher):
         Returns:
             Baostock 格式代码，如 "sh.518880"
         """
+        # 去除可能的市场前缀并规范化
+        code = etf_code.strip().lower()
+        for prefix in ["sh.", "sz.", "bj."]:
+            if code.startswith(prefix):
+                code = code[len(prefix):]
+                break
+
         # 检查是否已经是 Baostock 格式
-        if "." in etf_code:
-            return etf_code
+        if "." in code:
+            return code
 
         # ETF 默认在上海交易所
-        return f"{self.ETF_DEFAULT_PREFIX}.{etf_code}"
+        return f"{self.ETF_DEFAULT_PREFIX}.{code}"
 
     def _convert_stock_code(self, stock_code: str) -> str:
         """
@@ -148,14 +162,21 @@ class BaostockFetcher(DataFetcher):
         Returns:
             Baostock 格式代码，如 "sz.002594"
         """
+        # 去除可能的市场前缀并规范化
+        code = stock_code.strip().lower()
+        for prefix in ["sh.", "sz.", "bj."]:
+            if code.startswith(prefix):
+                code = code[len(prefix):]
+                break
+
         # 检查是否已经是 Baostock 格式
-        if "." in stock_code:
-            return stock_code
+        if "." in code:
+            return code
 
         # 根据首位数字判断市场
-        first_char = stock_code[0]
+        first_char = code[0] if code else ""
         prefix = self.STOCK_PREFIX.get(first_char, "sh")
-        return f"{prefix}.{stock_code}"
+        return f"{prefix}.{code}"
 
     def _format_date(self, d: Optional[date]) -> str:
         """
@@ -447,8 +468,16 @@ class BaostockFetcher(DataFetcher):
         if cached_df is None or cached_df.empty:
             return False
 
+        # 检查日期列是否有有效数据
+        if cached_df["date"].isna().all():
+            return False
+
         cached_start = cached_df["date"].min()
         cached_end = cached_df["date"].max()
+
+        # 检查是否为 NaT
+        if pd.isna(cached_start) or pd.isna(cached_end):
+            return False
 
         # 检查请求的日期范围是否在缓存范围内
         if start_date is not None and pd.Timestamp(start_date) < cached_start:

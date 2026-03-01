@@ -11,11 +11,6 @@ from pydantic_settings import BaseSettings
 class FetcherConfig(BaseSettings):
     """数据获取器配置"""
 
-    # 数据源选择
-    source: Literal["akshare", "tushare"] = Field(
-        default="akshare", description="数据源提供商"
-    )
-
     # 缓存配置
     cache_dir: Path = Field(default=Path("./data/cache"), description="缓存目录路径")
     cache_expire_hours: int = Field(default=24, description="缓存过期时间（小时）")

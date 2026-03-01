@@ -104,6 +104,8 @@ async def _update_all_assets_task(assets: List[Asset]):
                     _update_status["updated"] += 1
 
             except Exception as e:
+                # 回滚当前资产的事务，避免影响后续资产
+                db.rollback()
                 _update_status["errors"].append(f"{asset.code}: {str(e)}")
 
             _update_status["total"] = len(assets)

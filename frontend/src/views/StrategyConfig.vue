@@ -1,70 +1,128 @@
 <template>
   <div class="strategy-config">
-    <el-row :gutter="20">
-      <el-col :span="8">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>策略列表</span>
-              <el-button type="primary" @click="showCreateDialog = true">
-                新建策略
-              </el-button>
-            </div>
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>策略配置</span>
+          <el-button type="primary" @click="showCreateDialog = true">
+            新建策略
+          </el-button>
+        </div>
+      </template>
+
+      <!-- 筛选条件 -->
+      <div class="filter-bar">
+        <el-select
+          v-model="filterRebalanceType"
+          placeholder="按再平衡方式筛选"
+          clearable
+          style="width: 200px"
+        >
+          <el-option label="按月" value="monthly" />
+          <el-option label="按季度" value="quarterly" />
+          <el-option label="按年" value="yearly" />
+          <el-option label="阈值触发" value="threshold" />
+        </el-select>
+
+        <el-button
+          v-if="filterRebalanceType"
+          link
+          type="primary"
+          @click="resetFilters"
+          style="margin-left: 16px"
+        >
+          重置筛选
+        </el-button>
+      </div>
+
+      <el-table
+        :data="pagedStrategies"
+        @sort-change="handleSortChange"
+        stripe
+      >
+        <el-table-column prop="name" label="名称" sortable="custom">
+          <template #default="{ row }">
+            <strong>{{ row.name }}</strong>
           </template>
-
-          <el-table :data="strategyStore.strategies" @row-click="selectStrategy" stripe>
-            <el-table-column prop="name" label="名称" />
-            <el-table-column prop="rebalance_type" label="再平衡" width="100">
-              <template #default="{ row }">
-                {{ formatRebalanceType(row.rebalance_type) }}
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-
-      <el-col :span="16">
-        <el-card v-if="selectedStrategy">
-          <template #header>
-            <div class="card-header">
-              <span>{{ selectedStrategy.name }}</span>
-              <div>
-                <el-button @click="runBacktest">执行回测</el-button>
-                <el-button type="danger" @click="deleteStrategy">删除</el-button>
-              </div>
-            </div>
+        </el-table-column>
+        <el-table-column prop="rebalance_type" label="再平衡方式" width="120">
+          <template #default="{ row }">
+            {{ formatRebalanceType(row.rebalance_type) }}
           </template>
+        </el-table-column>
+        <el-table-column prop="description" label="描述" min-width="200">
+          <template #default="{ row }">
+            <span :title="row.description" class="description-text">
+              {{ row.description || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="180" sortable="custom">
+          <template #default="{ row }">
+            {{ formatDateTime(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="viewDetail(row)">
+              查看
+            </el-button>
+            <el-button link type="primary" @click="runBacktest(row)">
+              回测
+            </el-button>
+            <el-button link type="danger" @click="deleteStrategy(row)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="策略名称">
-              {{ selectedStrategy.name }}
-            </el-descriptions-item>
-            <el-descriptions-item label="再平衡方式">
-              {{ formatRebalanceType(selectedStrategy.rebalance_type) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="描述" :span="2">
-              {{ selectedStrategy.description || '-' }}
-            </el-descriptions-item>
-          </el-descriptions>
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        :total="totalCount"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
+    </el-card>
 
-          <h4 style="margin-top: 20px">资产配置</h4>
-          <el-table :data="allocationData">
-            <el-table-column prop="name" label="资产">
-              <template #default="{ row }">
-                {{ row.name }} ({{ row.code }})
-              </template>
-            </el-table-column>
-            <el-table-column prop="weight" label="权重">
-              <template #default="{ row }">
-                {{ (row.weight * 100).toFixed(1) }}%
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+    <!-- 策略详情弹窗 -->
+    <el-dialog v-model="showDetailDialog" title="策略详情" width="700px">
+      <div v-if="currentStrategy">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="策略名称">
+            {{ currentStrategy.name }}
+          </el-descriptions-item>
+          <el-descriptions-item label="再平衡方式">
+            {{ formatRebalanceType(currentStrategy.rebalance_type) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="描述" :span="2">
+            {{ currentStrategy.description || '-' }}
+          </el-descriptions-item>
+        </el-descriptions>
 
-        <el-empty v-else description="请选择一个策略" />
-      </el-col>
-    </el-row>
+        <h4 style="margin-top: 20px">资产配置</h4>
+        <el-table :data="allocationData">
+          <el-table-column prop="name" label="资产">
+            <template #default="{ row }">
+              {{ row.name }} ({{ row.code }})
+            </template>
+          </el-table-column>
+          <el-table-column prop="weight" label="权重">
+            <template #default="{ row }">
+              {{ (row.weight * 100).toFixed(1) }}%
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <template #footer>
+        <el-button @click="showDetailDialog = false">关闭</el-button>
+        <el-button type="primary" @click="runBacktestFromDetail">执行回测</el-button>
+        <el-button type="danger" @click="deleteStrategyFromDetail">删除</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 创建策略对话框 -->
     <el-dialog v-model="showCreateDialog" title="新建策略" width="600px">
@@ -164,8 +222,9 @@ const router = useRouter()
 const strategyStore = useStrategyStore()
 const assetStore = useAssetStore()
 
-const selectedStrategy = ref<Strategy | null>(null)
 const showCreateDialog = ref(false)
+const showDetailDialog = ref(false)
+const currentStrategy = ref<Strategy | null>(null)
 
 // 再平衡类型映射
 const rebalanceTypeMap: Record<string, string> = {
@@ -177,6 +236,19 @@ const rebalanceTypeMap: Record<string, string> = {
 
 const formatRebalanceType = (type: string) => {
   return rebalanceTypeMap[type] || type
+}
+
+// 格式化日期时间
+const formatDateTime = (dateStr: string | undefined) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}.${month}.${day} ${hours}:${minutes}:${seconds}`
 }
 
 const form = ref({
@@ -196,9 +268,57 @@ const isWeightValid = computed(() =>
   Math.abs(totalWeight.value - 100) < 0.01
 )
 
+// 筛选状态
+const filterRebalanceType = ref<string | undefined>()
+
+// 排序状态
+const sortField = ref<'name' | 'created_at'>('created_at')
+const sortOrder = ref<'ascending' | 'descending'>('descending')
+
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+// 筛选后的数据
+const filteredStrategies = computed(() => {
+  let data = [...strategyStore.strategies]
+
+  if (filterRebalanceType.value) {
+    data = data.filter(s => s.rebalance_type === filterRebalanceType.value)
+  }
+
+  return data
+})
+
+// 排序后的数据
+const sortedStrategies = computed(() => {
+  const data = [...filteredStrategies.value]
+  const order = sortOrder.value === 'ascending' ? 1 : -1
+
+  return data.sort((a, b) => {
+    if (sortField.value === 'name') {
+      return a.name.localeCompare(b.name) * order
+    } else {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+      return (dateA - dateB) * order
+    }
+  })
+})
+
+// 总条数
+const totalCount = computed(() => sortedStrategies.value.length)
+
+// 分页后的数据
+const pagedStrategies = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return sortedStrategies.value.slice(start, start + pageSize.value)
+})
+
+// 资产配置数据
 const allocationData = computed(() => {
-  if (!selectedStrategy.value) return []
-  return Object.entries(selectedStrategy.value.allocation).map(([code, weight]) => {
+  if (!currentStrategy.value) return []
+  return Object.entries(currentStrategy.value.allocation).map(([code, weight]) => {
     const asset = assetStore.assets.find(a => a.code === code)
     return {
       code,
@@ -211,13 +331,69 @@ const allocationData = computed(() => {
 onMounted(async () => {
   await assetStore.fetchAssets()
   await strategyStore.fetchStrategies()
-  if (strategyStore.strategies.length > 0) {
-    selectedStrategy.value = strategyStore.strategies[0]
-  }
 })
 
-const selectStrategy = (strategy: Strategy) => {
-  selectedStrategy.value = strategy
+// 排序变化
+const handleSortChange = ({ prop, order }: { prop: string; order: string | null }) => {
+  sortField.value = (prop === 'name' || prop === 'created_at') ? prop : 'created_at'
+  sortOrder.value = order === 'ascending' ? 'ascending' : 'descending'
+}
+
+// 重置筛选
+const resetFilters = () => {
+  filterRebalanceType.value = undefined
+  currentPage.value = 1
+}
+
+// 查看详情
+const viewDetail = (strategy: Strategy) => {
+  currentStrategy.value = strategy
+  showDetailDialog.value = true
+}
+
+// 从列表执行回测
+const runBacktest = (strategy: Strategy) => {
+  router.push({
+    name: 'Backtest',
+    query: { strategy_id: strategy.id, auto_run: 'true' }
+  })
+}
+
+// 从详情弹窗执行回测
+const runBacktestFromDetail = () => {
+  if (currentStrategy.value) {
+    showDetailDialog.value = false
+    runBacktest(currentStrategy.value)
+  }
+}
+
+// 删除策略
+const deleteStrategy = async (strategy: Strategy) => {
+  try {
+    await ElMessageBox.confirm(`确定删除策略「${strategy.name}」吗？`, '提示', {
+      type: 'warning',
+    })
+
+    await strategyStore.deleteStrategy(strategy.id)
+    ElMessage.success('策略删除成功')
+
+    // 如果当前页没有数据了，回到上一页
+    if (pagedStrategies.value.length === 1 && currentPage.value > 1) {
+      currentPage.value--
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('策略删除失败')
+    }
+  }
+}
+
+// 从详情弹窗删除策略
+const deleteStrategyFromDetail = () => {
+  if (currentStrategy.value) {
+    showDetailDialog.value = false
+    deleteStrategy(currentStrategy.value)
+  }
 }
 
 const addAllocation = () => {
@@ -234,9 +410,9 @@ const removeAllocation = (index: number) => {
 
 const onAssetChange = (index: number, code: string) => {
   const asset = assetStore.assets.find(a => a.code === code)
-  if (asset) {
-    form.value.allocations[index].code = asset.code
-    form.value.allocations[index].name = asset.name
+  if (asset && form.value.allocations[index]) {
+    form.value.allocations[index]!.code = asset.code
+    form.value.allocations[index]!.name = asset.name
   }
 }
 
@@ -264,7 +440,7 @@ const createStrategy = async () => {
     await strategyStore.createStrategy({
       name: form.value.name,
       description: form.value.description,
-      rebalance_type: form.value.rebalance_type,
+      rebalance_type: form.value.rebalance_type as 'monthly' | 'quarterly' | 'yearly' | 'threshold',
       allocation,
     })
 
@@ -274,29 +450,6 @@ const createStrategy = async () => {
   } catch (error) {
     ElMessage.error('策略创建失败')
   }
-}
-
-const deleteStrategy = async () => {
-  if (!selectedStrategy.value) return
-
-  try {
-    await ElMessageBox.confirm('确定删除该策略吗？', '提示', {
-      type: 'warning',
-    })
-
-    await strategyStore.deleteStrategy(selectedStrategy.value.id)
-    ElMessage.success('策略删除成功')
-    selectedStrategy.value = null
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('策略删除失败')
-    }
-  }
-}
-
-const runBacktest = () => {
-  if (!selectedStrategy.value) return
-  router.push({ name: 'Backtest', query: { strategy_id: selectedStrategy.value.id } })
 }
 </script>
 
@@ -309,6 +462,23 @@ const runBacktest = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.description-text {
+  display: inline-block;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .allocation-list {

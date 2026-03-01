@@ -8,7 +8,7 @@ import contextlib
 import pandas as pd
 import pytest
 
-from data_fetcher import BaostockFetcher, FetcherConfig, AKShareFetcher
+from data_fetcher import BaostockFetcher, FetcherConfig
 
 
 @pytest.fixture
@@ -157,18 +157,3 @@ class TestBaostockFetcher:
         # 清理
         while BaostockFetcher._login_count > 0:
             BaostockFetcher._safe_logout()
-
-
-class TestAKShareFetcher:
-    """AKShare 获取器测试（保留作为备用）"""
-
-    def test_init_default_config(self):
-        """测试默认配置初始化"""
-        fetcher = AKShareFetcher()
-        assert fetcher.config is not None
-        assert fetcher.config.source == "akshare"
-
-    def test_init_custom_config(self, fetcher_config):
-        """测试自定义配置初始化"""
-        fetcher = AKShareFetcher(config=fetcher_config)
-        assert fetcher.config == fetcher_config

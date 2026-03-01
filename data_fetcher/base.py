@@ -131,6 +131,9 @@ class DataFetcher(ABC):
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
+        # 过滤掉包含 NaN 的行（数据源可能返回空字符串）
+        df = df.dropna(subset=numeric_columns)
+
         # 按日期排序
         df = df.sort_values("date").reset_index(drop=True)
 

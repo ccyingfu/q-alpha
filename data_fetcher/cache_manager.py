@@ -145,16 +145,26 @@ class CacheManager:
         # 保存数据
         df.to_parquet(cache_path, index=False)
 
+        # 计算日期范围，处理可能的 NaT 情况
+        date_min = df["date"].min()
+        date_max = df["date"].max()
+        
+        # 检查是否为有效日期
+        if pd.isna(date_min) or pd.isna(date_max):
+            data_range = {"start": "", "end": ""}
+        else:
+            data_range = {
+                "start": date_min.strftime("%Y-%m-%d"),
+                "end": date_max.strftime("%Y-%m-%d"),
+            }
+
         # 保存元数据
         meta = CacheMetadata(
             file_path=str(cache_path),
             created_at=datetime.now(),
             expires_at=datetime.now() + timedelta(hours=self.expire_hours),
             rows=len(df),
-            data_range={
-                "start": df["date"].min().strftime("%Y-%m-%d"),
-                "end": df["date"].max().strftime("%Y-%m-%d"),
-            },
+            data_range=data_range,
         )
 
         with open(meta_path, "w", encoding="utf-8") as f:

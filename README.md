@@ -46,8 +46,7 @@
 Python 3.11+
 ├── FastAPI          # 高性能 Web 框架
 ├── SQLAlchemy 2.0   # ORM
-├── Baostock         # 金融数据源（主要）
-├── AKShare          # 金融数据源（备用）
+├── Baostock         # 金融数据源（免费、无需注册）
 ├── Pandas/NumPy     # 数据处理
 ├── Pydantic         # 数据验证
 └── PyArrow          # 列式存储缓存
@@ -245,8 +244,7 @@ q-alpha/
 │
 ├── data_fetcher/           # 数据获取模块
 │   ├── base.py             # 抽象基类
-│   ├── baostock_fetcher.py # Baostock 实现（主要数据源）
-│   ├── akshare_fetcher.py  # AKShare 实现（备用数据源）
+│   ├── baostock_fetcher.py # Baostock 实现
 │   ├── cache_manager.py    # 缓存管理
 │   └── config.py           # 配置文件
 │
@@ -428,7 +426,6 @@ rm -rf data/cache/*
 ## 🙏 致谢
 
 - [Baostock](http://baostock.com/) - 证券宝免费数据接口
-- [AKShare](https://akshare.akfamily.xyz/) - 中国金融数据接口
 - [FastAPI](https://fastapi.tiangolo.com/) - 现代化 Python Web 框架
 - [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
 - [ECharts](https://echarts.apache.org/) - 强大的数据可视化库
