@@ -39,6 +39,8 @@
         :data="pagedStrategies"
         @sort-change="handleSortChange"
         stripe
+        v-loading="strategyStore.loading"
+        element-loading-text="加载中..."
       >
         <el-table-column prop="name" label="名称" sortable="custom">
           <template #default="{ row }">

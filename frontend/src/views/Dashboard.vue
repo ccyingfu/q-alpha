@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard" v-loading="isLoading" element-loading-text="加载中...">
     <el-row :gutter="20">
       <el-col :span="6">
         <el-card class="stat-card">
@@ -96,16 +96,23 @@ const assetStore = useAssetStore()
 const strategyCount = ref(0)
 const backtestCount = ref(0)
 const assetCount = ref(0)
+const isLoading = ref(true)
 
 onMounted(async () => {
-  // 加载统计数据
-  await strategyStore.fetchStrategies()
-  await backtestStore.fetchResults()
-  await assetStore.fetchAssets()
+  try {
+    // 并行加载统计数据
+    await Promise.all([
+      strategyStore.fetchStrategies(),
+      backtestStore.fetchResults(),
+      assetStore.fetchAssets(),
+    ])
 
-  strategyCount.value = strategyStore.strategies.length
-  backtestCount.value = backtestStore.results.length
-  assetCount.value = assetStore.assets.length
+    strategyCount.value = strategyStore.strategies.length
+    backtestCount.value = backtestStore.results.length
+    assetCount.value = assetStore.assets.length
+  } finally {
+    isLoading.value = false
+  }
 })
 </script>
 

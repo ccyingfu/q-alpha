@@ -35,7 +35,7 @@ class Asset(Base):
 
     # 基本信息
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     type: Mapped[AssetType] = mapped_column(String(20), nullable=False, index=True)
 
     # 描述信息

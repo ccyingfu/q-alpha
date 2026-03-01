@@ -32,7 +32,13 @@
       </div>
 
       <!-- 资产表格 -->
-      <el-table :data="pagedAssets" stripe @sort-change="handleSortChange">
+      <el-table
+        :data="pagedAssets"
+        stripe
+        @sort-change="handleSortChange"
+        v-loading="assetStore.loading && !isUpdating"
+        element-loading-text="加载中..."
+      >
         <el-table-column prop="code" label="代码" width="120" sortable />
         <el-table-column prop="name" label="名称" width="150" sortable />
         <el-table-column prop="type" label="类型" width="100" sortable>
@@ -43,7 +49,7 @@
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column label="操作" width="150">
           <template #default="{ row }">
-            <el-button link type="primary" @click="viewData(row)">查看</el-button>
+            <el-button link type="primary" @click="viewData(row)" :loading="viewDataLoading === row.id">查看</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -143,7 +149,7 @@
       </div>
 
       <!-- 数据表格 -->
-      <el-table :data="pagedData" max-height="400" stripe>
+      <el-table :data="pagedData" max-height="400" stripe v-loading="viewDataLoading !== null" element-loading-text="加载中...">
         <el-table-column prop="date" label="日期" width="120" sortable />
         <el-table-column prop="open" label="开盘" width="100" sortable />
         <el-table-column prop="high" label="最高" width="100" sortable />
@@ -222,6 +228,7 @@ const showAddDialog = ref(false)
 const formRef = ref<FormInstance>()
 const isSubmitting = ref(false)
 const isQuerying = ref(false)
+const viewDataLoading = ref<number | null>(null)
 
 // 表单数据
 const formData = ref({
@@ -601,6 +608,7 @@ const refreshData = async () => {
 
 const viewData = async (asset: Asset) => {
   currentAsset.value = asset
+  viewDataLoading.value = asset.id
 
   try {
     const response = await marketApi.getDaily(asset.code)
@@ -610,6 +618,8 @@ const viewData = async (asset: Asset) => {
     currentPage.value = 1
   } catch (error) {
     ElMessage.error('获取数据失败')
+  } finally {
+    viewDataLoading.value = null
   }
 }
 </script>

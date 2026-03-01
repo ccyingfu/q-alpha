@@ -58,6 +58,8 @@
         :data="pagedResults"
         @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
+        v-loading="backtestStore.loading"
+        element-loading-text="加载中..."
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="strategy_name" label="策略" />
