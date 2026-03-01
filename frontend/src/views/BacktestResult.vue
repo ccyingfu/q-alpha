@@ -129,16 +129,22 @@
 
       <!-- 指标统计 -->
       <el-row :gutter="20" class="metrics-row">
-        <el-col :span="6">
+        <el-col :span="4.8">
+          <div class="date-range-statistic">
+            <div class="statistic-title">时间范围</div>
+            <div class="statistic-value">{{ formatDotDate(selectedResult.start_date) }} 到 {{ formatDotDate(selectedResult.end_date) }}</div>
+          </div>
+        </el-col>
+        <el-col :span="4.8">
           <el-statistic title="总收益率" :value="selectedResult.metrics.total_return * 100" :precision="2" suffix="%" />
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4.8">
           <el-statistic title="年化收益率" :value="selectedResult.metrics.annual_return * 100" :precision="2" suffix="%" />
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4.8">
           <el-statistic title="最大回撤" :value="selectedResult.metrics.max_drawdown * 100" :precision="2" suffix="%" />
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4.8">
           <el-statistic title="夏普比率" :value="selectedResult.metrics.sharpe_ratio" :precision="2" />
         </el-col>
       </el-row>
@@ -684,6 +690,13 @@ const formatDate = (dateStr: string | undefined) => {
   return dateStr.split('T')[0]
 }
 
+const formatDotDate = (dateStr: string | undefined) => {
+  if (!dateStr) return '-'
+  const parts = dateStr.split('T')[0]?.split('-')
+  if (!parts || parts.length !== 3) return '-'
+  return `${parts[0]}.${parts[1]}.${parts[2]}`
+}
+
 const formatDateTime = (dateStr: string | undefined) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
@@ -882,6 +895,23 @@ const handleBatchDelete = async () => {
 
 .text-danger {
   color: #f56c6c;
+}
+
+/* 时间范围样式 */
+.date-range-statistic {
+  text-align: center;
+}
+
+.statistic-title {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.statistic-value {
+  font-size: 10px;
+  font-weight: 500;
+  color: #303133;
 }
 
 /* 高亮行样式 */
