@@ -128,7 +128,24 @@ python -m scripts.init_db
 
 ### 运行项目
 
-**方式一：命令行启动**
+**方式一：一键启动（推荐）**
+
+```bash
+# 启动所有服务（后端 + 前端）
+./start.sh
+
+# 关闭所有服务
+./stop.sh
+
+# 重启所有服务
+./restart.sh
+```
+
+服务将在后台运行，日志保存在 `logs/` 目录：
+- 后端日志：`logs/backend.log`
+- 前端日志：`logs/frontend.log`
+
+**方式二：命令行启动**
 
 启动后端（项目根目录）：
 ```bash
@@ -143,16 +160,6 @@ python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```bash
 cd frontend
 npm run dev
-```
-
-**方式二：使用项目脚本**
-
-```bash
-# 启动后端
-./scripts/start-backend.sh
-
-# 启动前端
-./scripts/start-frontend.sh
 ```
 
 ### 访问应用

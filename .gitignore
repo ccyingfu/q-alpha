@@ -63,6 +63,11 @@ frontend/.output/
 *.log
 logs/
 
+# PID files
+*.pid
+.backend.pid
+.frontend.pid
+
 # OS
 .DS_Store
 Thumbs.db
