@@ -63,17 +63,28 @@ async def run_backtest(
         if not existing_data:
             need_refresh = True
         else:
-            # 检查数据的最新日期是否覆盖请求的结束日期
+            # 检查数据的日期范围是否覆盖请求的日期范围
             # 允许一定的容忍度（考虑到数据源可能有1-2天的延迟）
             from datetime import timedelta
-            latest_date = max(d.date for d in existing_data)
-            # 确保 latest_date 是 date 类型
+            all_dates_in_data = [d.date for d in existing_data]
+            earliest_date = min(all_dates_in_data)
+            latest_date = max(all_dates_in_data)
+            
+            # 确保 earliest_date 和 latest_date 是 date 类型
+            if isinstance(earliest_date, datetime):
+                earliest_date = earliest_date.date()
             if isinstance(latest_date, datetime):
                 latest_date = latest_date.date()
+            
             # 安全提取 date 类型
+            request_start = request.start_date if isinstance(request.start_date, date) and not isinstance(request.start_date, datetime) else request.start_date.date()
             request_end = request.end_date if isinstance(request.end_date, date) and not isinstance(request.end_date, datetime) else request.end_date.date()
-            # 如果最新数据早于请求结束日期超过7天，需要刷新
-            if (request_end - latest_date) > timedelta(days=7):
+            
+            # 如果最早数据晚于请求开始日期超过7天，需要刷新（数据不够旧）
+            if (earliest_date - request_start) > timedelta(days=7):
+                need_refresh = True
+            # 如果最新数据早于请求结束日期超过7天，需要刷新（数据不够新）
+            elif (request_end - latest_date) > timedelta(days=7):
                 need_refresh = True
 
         # 如果没有数据或数据不完整，自动获取

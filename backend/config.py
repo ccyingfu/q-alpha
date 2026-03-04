@@ -20,9 +20,9 @@ class Settings(BaseSettings):
 
     # CORS 配置
     cors_origins: List[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000"],
+        default=["http://localhost:8001", "http://localhost:5173", "http://localhost:3000"],
         description="允许的 CORS 源",
-    )
+    ),
 
     # 数据库配置
     database_url: str = Field(default="sqlite:///q_alpha.db", description="数据库 URL")

@@ -2,6 +2,7 @@
 #
 # Q-Alpha 一键启动脚本
 # 同时启动后端和前端服务
+# 支持自动初始化项目
 #
 
 set -e
@@ -27,20 +28,85 @@ echo "  Q-Alpha 量化策略回测系统"
 echo "==================================="
 echo ""
 
+# 初始化项目函数
+init_project() {
+    echo ""
+    echo -e "${YELLOW}检测到项目未初始化，开始自动初始化...${NC}"
+    echo ""
+
+    # 创建日志目录
+    mkdir -p "$PROJECT_ROOT/logs"
+
+    # 初始化后端
+    if [ ! -d "$PROJECT_ROOT/.venv" ]; then
+        echo -e "${BLUE}[1/2]${NC} 初始化后端环境..."
+        cd "$PROJECT_ROOT"
+
+        # 检查 Python 是否安装
+        if ! command -v python3 &> /dev/null; then
+            echo -e "${RED}错误: 未找到 Python3${NC}"
+            exit 1
+        fi
+
+        # 创建虚拟环境
+        echo "创建虚拟环境..."
+        python3 -m venv .venv
+
+        # 激活虚拟环境并安装依赖
+        echo "安装后端依赖..."
+        source .venv/bin/activate
+        pip install --upgrade pip -q
+        pip install -r requirements.txt -q
+
+        echo -e "${GREEN}✓${NC} 后端环境初始化完成"
+    else
+        echo -e "${GREEN}✓${NC} 后端环境已存在"
+    fi
+
+    # 初始化前端
+    if [ ! -d "$PROJECT_ROOT/frontend/node_modules" ]; then
+        echo ""
+        echo -e "${BLUE}[2/2]${NC} 初始化前端环境..."
+        cd "$PROJECT_ROOT/frontend"
+
+        # 检查 Node.js 是否安装
+        if ! command -v node &> /dev/null; then
+            echo -e "${RED}错误: 未找到 Node.js${NC}"
+            exit 1
+        fi
+
+        # 安装前端依赖
+        echo "安装前端依赖..."
+        npm install -q
+
+        echo -e "${GREEN}✓${NC} 前端环境初始化完成"
+    else
+        echo -e "${GREEN}✓${NC} 前端环境已存在"
+    fi
+
+    echo ""
+    echo -e "${GREEN}项目初始化完成！${NC}"
+    echo ""
+}
+
+# 检查是否需要初始化
+NEED_INIT=false
+
 # 检查虚拟环境
 VENV_PATH="$PROJECT_ROOT/.venv"
 
 if [ ! -d "$VENV_PATH" ]; then
-    echo -e "${YELLOW}警告: 虚拟环境不存在${NC}"
-    echo "请先运行 ./scripts/run_all.sh 初始化项目"
-    exit 1
+    NEED_INIT=true
 fi
 
 # 检查前端依赖
 if [ ! -d "$PROJECT_ROOT/frontend/node_modules" ]; then
-    echo -e "${YELLOW}警告: 前端依赖未安装${NC}"
-    echo "请先运行 ./scripts/run_all.sh 初始化项目"
-    exit 1
+    NEED_INIT=true
+fi
+
+# 如果需要初始化，执行初始化
+if [ "$NEED_INIT" = true ]; then
+    init_project
 fi
 
 # 检查是否已有服务在运行
@@ -117,7 +183,7 @@ echo "==================================="
 echo ""
 echo -e "后端 API: ${BLUE}http://localhost:8000${NC}"
 echo -e "API 文档: ${BLUE}http://localhost:8000/docs${NC}"
-echo -e "前端界面: ${BLUE}http://localhost:5173${NC}"
+echo -e "前端界面: ${BLUE}http://localhost:8001${NC}"
 echo ""
 echo "日志文件:"
 echo "  - 后端: logs/backend.log"
