@@ -116,23 +116,34 @@ class MarketDataRepository:
         Returns:
             行情数据列表
         """
-        from sqlalchemy import func
-        
+        from sqlalchemy import and_, func, or_
+
         query = self.db.query(MarketDaily).filter(MarketDaily.asset_id == asset_id)
 
-        # 使用日期部分进行比较，避免时间部分的影响
         # 安全提取日期部分（兼容 datetime 和 date 类型）
-        def to_date(d):
+        def to_date_str(d):
+            """将日期转换为 YYYY-MM-DD 格式的字符串"""
             if d is None:
                 return None
-            if isinstance(d, date) and not isinstance(d, datetime):
-                return d
-            return d.date()
+            if isinstance(d, datetime):
+                return d.strftime("%Y-%m-%d")
+            return d.strftime("%Y-%m-%d")
 
+        # SQLite 使用字符串比较 date 字段
+        # date 字段存储格式为 "YYYY-MM-DD HH:MM:SS.ffffff"
+        # 通过字符串前缀比较实现日期范围过滤
         if start_date:
-            query = query.filter(func.date(MarketDaily.date) >= to_date(start_date))
+            start_str = to_date_str(start_date)
+            # 大于等于开始日期: date >= start_str
+            query = query.filter(MarketDaily.date >= start_str)
         if end_date:
-            query = query.filter(func.date(MarketDaily.date) <= to_date(end_date))
+            end_str = to_date_str(end_date)
+            # 小于等于结束日期: 需要特殊处理，因为字符串比较
+            # 使用 date + 1 天的方式来包含当天的所有时间
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_str, "%Y-%m-%d") + timedelta(days=1)
+            end_next_str = end_dt.strftime("%Y-%m-%d")
+            query = query.filter(MarketDaily.date < end_next_str)
 
         return query.order_by(MarketDaily.date).all()
 

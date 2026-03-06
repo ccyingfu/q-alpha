@@ -136,6 +136,9 @@ fi
 echo "激活虚拟环境..."
 source "$VENV_PATH/bin/activate"
 
+# 确保日志目录存在
+mkdir -p "$PROJECT_ROOT/logs"
+
 # 启动后端服务
 echo ""
 echo -e "${BLUE}[1/2]${NC} 启动后端服务..."

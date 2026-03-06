@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>策略配置</span>
-          <el-button type="primary" @click="showCreateDialog = true">
+          <el-button type="primary" @click="openCreateDialog">
             新建策略
           </el-button>
         </div>
@@ -64,10 +64,13 @@
             {{ formatDateTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row)">
               查看
+            </el-button>
+            <el-button link type="primary" @click="editStrategy(row)">
+              编辑
             </el-button>
             <el-button link type="primary" @click="runBacktest(row)">
               回测
@@ -126,8 +129,8 @@
       </template>
     </el-dialog>
 
-    <!-- 创建策略对话框 -->
-    <el-dialog v-model="showCreateDialog" title="新建策略" width="600px">
+    <!-- 创建/编辑策略对话框 -->
+    <el-dialog v-model="showCreateDialog" :title="isEditMode ? '编辑策略' : '新建策略'" width="600px" @close="onDialogClose">
       <el-form :model="form" label-width="100px">
         <el-form-item label="策略名称" required>
           <el-input v-model="form.name" placeholder="请输入策略名称" />
@@ -197,8 +200,8 @@
 
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" :disabled="!isWeightValid" @click="createStrategy">
-          确定
+        <el-button type="primary" :disabled="!isWeightValid" @click="saveStrategy">
+          {{ isEditMode ? '保存' : '确定' }}
         </el-button>
       </template>
     </el-dialog>
@@ -227,6 +230,8 @@ const assetStore = useAssetStore()
 const showCreateDialog = ref(false)
 const showDetailDialog = ref(false)
 const currentStrategy = ref<Strategy | null>(null)
+const isEditMode = ref(false)
+const editingStrategyId = ref<number | null>(null)
 
 // 再平衡类型映射
 const rebalanceTypeMap: Record<string, string> = {
@@ -353,6 +358,44 @@ const viewDetail = (strategy: Strategy) => {
   showDetailDialog.value = true
 }
 
+// 编辑策略
+const editStrategy = (strategy: Strategy) => {
+  isEditMode.value = true
+  editingStrategyId.value = strategy.id
+
+  // 回填表单数据
+  form.value.name = strategy.name
+  form.value.description = strategy.description || ''
+  form.value.rebalance_type = strategy.rebalance_type
+
+  // 回填资产配置
+  form.value.allocations = Object.entries(strategy.allocation).map(([code, weight]) => {
+    const asset = assetStore.assets.find(a => a.code === code)
+    return {
+      code,
+      name: asset?.name || code,
+      weight: weight * 100, // 转换为百分比
+    }
+  })
+
+  showCreateDialog.value = true
+}
+
+// 对话框关闭时重置
+const onDialogClose = () => {
+  resetForm()
+  isEditMode.value = false
+  editingStrategyId.value = null
+}
+
+// 打开新建对话框
+const openCreateDialog = () => {
+  isEditMode.value = false
+  editingStrategyId.value = null
+  resetForm()
+  showCreateDialog.value = true
+}
+
 // 从列表执行回测
 const runBacktest = (strategy: Strategy) => {
   router.push({
@@ -427,7 +470,7 @@ const resetForm = () => {
   }
 }
 
-const createStrategy = async () => {
+const saveStrategy = async () => {
   if (!isWeightValid.value) {
     ElMessage.warning('资产权重合计必须等于100%')
     return
@@ -439,18 +482,26 @@ const createStrategy = async () => {
       allocation[item.code] = item.weight / 100
     })
 
-    await strategyStore.createStrategy({
+    const strategyData = {
       name: form.value.name,
       description: form.value.description,
       rebalance_type: form.value.rebalance_type as 'monthly' | 'quarterly' | 'yearly' | 'threshold',
       allocation,
-    })
+    }
 
-    ElMessage.success('策略创建成功')
+    if (isEditMode.value && editingStrategyId.value) {
+      // 更新策略
+      await strategyStore.updateStrategy(editingStrategyId.value, strategyData)
+      ElMessage.success('策略更新成功')
+    } else {
+      // 创建策略
+      await strategyStore.createStrategy(strategyData)
+      ElMessage.success('策略创建成功')
+    }
+
     showCreateDialog.value = false
-    resetForm()
   } catch (error) {
-    ElMessage.error('策略创建失败')
+    ElMessage.error(isEditMode.value ? '策略更新失败' : '策略创建失败')
   }
 }
 </script>

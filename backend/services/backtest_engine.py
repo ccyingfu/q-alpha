@@ -80,6 +80,9 @@ class BacktestEngine:
 
         # 获取所有资产的行情数据
         asset_data = {}
+        start_date_only = start_date.date() if isinstance(start_date, datetime) else start_date
+        end_date_only = end_date.date() if isinstance(end_date, datetime) else end_date
+
         for code in asset_codes:
             asset = asset_repo.get_by_code(code)
             if not asset:
@@ -87,7 +90,36 @@ class BacktestEngine:
 
             data = market_repo.get_by_asset(asset.id, start_date, end_date)
             if not data:
-                raise ValueError(f"No market data for asset {code}")
+                # 检查该资产在数据库中的可用日期范围
+                all_asset_data = market_repo.get_by_asset(asset.id, None, None)
+                if all_asset_data:
+                    min_date = min(d.date for d in all_asset_data)
+                    max_date = max(d.date for d in all_asset_data)
+                    if isinstance(min_date, datetime):
+                        min_date = min_date.date()
+                    if isinstance(max_date, datetime):
+                        max_date = max_date.date()
+                    raise ValueError(
+                        f"资产 {code}({asset.name}) 在请求的日期范围 {start_date_only} 至 {end_date_only} 内没有数据。"
+                        f"可用数据范围: {min_date} 至 {max_date}"
+                    )
+                else:
+                    raise ValueError(f"资产 {code}({asset.name}) 没有任何市场数据")
+
+            # 检查返回的数据是否在请求的范围内
+            data_min_date = min(d.date for d in data)
+            data_max_date = max(d.date for d in data)
+            if isinstance(data_min_date, datetime):
+                data_min_date = data_min_date.date()
+            if isinstance(data_max_date, datetime):
+                data_max_date = data_max_date.date()
+
+            # 验证数据确实在请求的范围内
+            if data_min_date > end_date_only or data_max_date < start_date_only:
+                raise ValueError(
+                    f"资产 {code}({asset.name}) 的数据范围 {data_min_date} 至 {data_max_date} "
+                    f"与请求范围 {start_date_only} 至 {end_date_only} 不匹配"
+                )
 
             # 转换为 DataFrame
             df = pd.DataFrame(
@@ -139,14 +171,17 @@ class BacktestEngine:
                 available_weights = {}
                 total_available_weight = 0.0
                 for code in asset_codes:
-                    if dt in asset_data[code].index:
+                    # 使用 isin() 方法检查，然后取第一个元素
+                    if asset_data[code].index.isin([dt]).any():
                         available_weights[code] = asset_weights[code]
                         total_available_weight += asset_weights[code]
 
                 # 如果有可投资资产，按权重归一化后投资
                 if total_available_weight > 0:
                     for code, weight in available_weights.items():
-                        price = asset_data[code].loc[dt, "close"]
+                        # 获取收盘价，处理 scalar 和 Series 两种情况
+                        price_value = asset_data[code].loc[dt, "close"]
+                        price = price_value if isinstance(price_value, (int, float)) else price_value.iloc[0]
                         # 按归一化后的权重投资（确保有数据的资产分配到全部资金）
                         normalized_weight = weight / total_available_weight
                         amount_to_invest = cash * normalized_weight
@@ -161,9 +196,12 @@ class BacktestEngine:
             total_value = cash  # 初始为剩余现金
             has_data = False  # 标记当天是否有任何资产数据
             for code in asset_codes:
-                if dt in asset_data[code].index and holdings[code] > 0:
+                # 使用 isin() 方法检查
+                if asset_data[code].index.isin([dt]).any() and holdings[code] > 0:
                     has_data = True
-                    price = asset_data[code].loc[dt, "close"]
+                    # 获取收盘价，处理 scalar 和 Series 两种情况
+                    price_value = asset_data[code].loc[dt, "close"]
+                    price = price_value if isinstance(price_value, (int, float)) else price_value.iloc[0]
                     value = holdings[code] * price
                     total_value += value
 

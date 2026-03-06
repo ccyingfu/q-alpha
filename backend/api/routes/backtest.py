@@ -2,7 +2,7 @@
 回测执行接口
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -65,7 +65,6 @@ async def run_backtest(
         else:
             # 检查数据的日期范围是否覆盖请求的日期范围
             # 允许一定的容忍度（考虑到数据源可能有1-2天的延迟）
-            from datetime import timedelta
             all_dates_in_data = [d.date for d in existing_data]
             earliest_date = min(all_dates_in_data)
             latest_date = max(all_dates_in_data)
@@ -92,30 +91,58 @@ async def run_backtest(
             try:
                 # 根据资产类型选择获取方法
                 # 安全提取日期部分
-                start = request.start_date if isinstance(request.start_date, date) and not isinstance(request.start_date, datetime) else request.start_date.date()
-                end = request.end_date if isinstance(request.end_date, date) and not isinstance(request.end_date, datetime) else request.end_date.date()
+                request_start = request.start_date if isinstance(request.start_date, date) and not isinstance(request.start_date, datetime) else request.start_date.date()
+                request_end = request.end_date if isinstance(request.end_date, date) and not isinstance(request.end_date, datetime) else request.end_date.date()
 
-                if asset.type == "index":
-                    df = fetcher.fetch_index_daily(asset_code, start, end)
-                elif asset.type == "etf":
-                    df = fetcher.fetch_etf_daily(asset_code, start, end)
-                elif asset.type == "stock":
-                    df = fetcher.fetch_stock_daily(asset_code, start, end)
-                else:
-                    raise HTTPException(
-                        status_code=400, detail=f"Unsupported asset type: {asset.type}"
-                    )
+                # 计算实际需要获取的日期范围（只获取缺失的部分）
+                fetch_start = request_start
+                fetch_end = request_end
 
-                # 检查数据是否为空
-                if df.empty:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"未获取到 {asset_code}({asset.name}) 的市场数据，请检查资产代码或日期范围"
-                    )
+                if existing_data:
+                    # 如果已有数据，只获取缺失的部分
+                    all_dates_in_data = [d.date for d in existing_data]
+                    earliest_date = min(all_dates_in_data)
+                    latest_date = max(all_dates_in_data)
 
-                # 删除旧数据再存储新数据（避免重复）
-                market_repo.delete_by_asset(asset.id)
-                market_repo.bulk_create_from_df(df, asset.id)
+                    # 确保 earliest_date 和 latest_date 是 date 类型
+                    if isinstance(earliest_date, datetime):
+                        earliest_date = earliest_date.date()
+                    if isinstance(latest_date, datetime):
+                        latest_date = latest_date.date()
+
+                    # 如果请求的开始日期早于已有数据，需要获取更早的数据
+                    if request_start < earliest_date:
+                        fetch_start = request_start
+                        fetch_end = earliest_date - timedelta(days=1)
+                    # 如果请求的结束日期晚于已有数据，需要获取更新的数据
+                    elif request_end > latest_date:
+                        fetch_start = latest_date + timedelta(days=1)
+                        fetch_end = request_end
+                    else:
+                        # 数据已完整，不需要获取
+                        need_refresh = False
+
+                if need_refresh:
+                    if asset.type == "index":
+                        df = fetcher.fetch_index_daily(asset_code, fetch_start, fetch_end)
+                    elif asset.type == "etf":
+                        df = fetcher.fetch_etf_daily(asset_code, fetch_start, fetch_end)
+                    elif asset.type == "stock":
+                        df = fetcher.fetch_stock_daily(asset_code, fetch_start, fetch_end)
+                    else:
+                        raise HTTPException(
+                            status_code=400, detail=f"Unsupported asset type: {asset.type}"
+                        )
+
+                    # 检查数据是否为空
+                    if df.empty:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"未获取到 {asset_code}({asset.name}) 的市场数据，请检查资产代码或日期范围"
+                        )
+
+                    # 只存储新获取的数据（不删除旧数据）
+                    market_repo.bulk_create_from_df(df, asset.id)
 
             except HTTPException:
                 raise
