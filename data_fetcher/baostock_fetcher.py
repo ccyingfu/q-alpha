@@ -3,6 +3,8 @@ Baostock 数据获取器实现
 
 使用 Baostock 库获取中国金融市场的历史数据。
 Baostock 是证券宝提供的免费数据接口，无需注册、无限制调用。
+
+注意：Baostock 不支持 ETF 数据，ETF 数据通过 AKShare 获取。
 """
 
 import logging
@@ -279,6 +281,8 @@ class BaostockFetcher(DataFetcher):
         """
         获取 ETF 日线数据
 
+        注意：Baostock 不支持 ETF 数据，此方法会委托给 AKShareETFFetcher 获取。
+
         Args:
             etf_code: ETF 代码，如 "518880"（黄金ETF）
             start_date: 开始日期
@@ -287,58 +291,12 @@ class BaostockFetcher(DataFetcher):
         Returns:
             标准化的 DataFrame
         """
-        # 尝试从缓存获取，但需要检查缓存数据是否覆盖请求的日期范围
-        if self.cache:
-            cached_df = self.cache.get("etf", etf_code)
-            if cached_df is not None and self._is_cache_sufficient(cached_df, start_date, end_date):
-                logger.info(f"从缓存获取 ETF 数据: {etf_code}")
-                return self._filter_by_date(cached_df, start_date, end_date)
-
-        # 从 Baostock 获取数据
-        try:
-            self._ensure_login()
-            logger.info(f"从 Baostock 获取 ETF 数据: {etf_code}")
-
-            # 转换代码格式
-            bs_code = self._convert_etf_code(etf_code)
-
-            # 设置默认日期范围
-            end = self._format_date(end_date) or datetime.now().strftime("%Y-%m-%d")
-            start = self._format_date(start_date) or "2000-01-01"
-
-            # 查询数据
-            rs = bs.query_history_k_data_plus(
-                bs_code,
-                "date,open,high,low,close,volume",
-                start_date=start,
-                end_date=end,
-                frequency="d",
-                adjustflag="2"  # ETF 使用前复权
-            )
-
-            if rs.error_code != "0":
-                raise RuntimeError(f"Baostock 查询失败: {rs.error_msg}")
-
-            # 转换为 DataFrame
-            data_list = []
-            while (rs.error_code == "0") & rs.next():
-                data_list.append(rs.get_row_data())
-
-            df = pd.DataFrame(data_list, columns=rs.fields)
-
-            # 标准化格式
-            df = self._standardize_dataframe(df)
-
-            # 更新缓存
-            if self.cache:
-                self.cache.update("etf", etf_code, df)
-
-            # 过滤日期范围
-            return self._filter_by_date(df, start_date, end_date)
-
-        except Exception as e:
-            logger.error(f"获取 ETF 数据失败: {etf_code}, 错误: {e}")
-            raise
+        # Baostock 不支持 ETF，委托给 AKShare 获取器
+        from .akshare_etf_fetcher import AKShareETFFetcher
+        
+        logger.info(f"Baostock 不支持 ETF 数据，使用 AKShare 获取: {etf_code}")
+        akshare_fetcher = AKShareETFFetcher(self.config)
+        return akshare_fetcher.fetch_etf_daily(etf_code, start_date, end_date)
 
     @retry(
         stop=stop_after_attempt(3),
